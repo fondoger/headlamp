@@ -1,124 +1,185 @@
 import '../../../i18n/config';
-import { useTheme } from '@material-ui/core';
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
-import Dialog, { DialogProps } from '@material-ui/core/Dialog';
-import DialogActions from '@material-ui/core/DialogActions';
-import DialogContent from '@material-ui/core/DialogContent';
-import DialogTitle from '@material-ui/core/DialogTitle';
-import FormControlLabel from '@material-ui/core/FormControlLabel';
-import FormGroup from '@material-ui/core/FormGroup';
-import Grid from '@material-ui/core/Grid';
-import { makeStyles } from '@material-ui/core/styles';
-import Switch from '@material-ui/core/Switch';
-import Typography from '@material-ui/core/Typography';
-import useMediaQuery from '@material-ui/core/useMediaQuery';
 import Editor, { loader } from '@monaco-editor/react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormGroup from '@mui/material/FormGroup';
+import Grid from '@mui/material/Grid';
+import Switch from '@mui/material/Switch';
+import Typography from '@mui/material/Typography';
 import * as yaml from 'js-yaml';
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
+import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { KubeObjectInterface } from '../../../lib/k8s/cluster';
+import { useDispatch } from 'react-redux';
+import { getCluster } from '../../../lib/cluster';
+import { apply } from '../../../lib/k8s/apiProxy';
+import { KubeObjectInterface } from '../../../lib/k8s/KubeObject';
 import { getThemeName } from '../../../lib/themes';
+import { useId } from '../../../lib/util';
+import { clusterAction } from '../../../redux/clusterActionSlice';
+import {
+  EventStatus,
+  HeadlampEventType,
+  useEventCallback,
+} from '../../../redux/headlampEventSlice';
+import { AppDispatch } from '../../../redux/stores/store';
 import ConfirmButton from '../ConfirmButton';
+import { Dialog, DialogProps } from '../Dialog';
 import Loader from '../Loader';
 import Tabs from '../Tabs';
 import DocsViewer from './DocsViewer';
 import SimpleEditor from './SimpleEditor';
 
-const useStyle = makeStyles(theme => ({
-  dialogContent: {
-    height: '80%',
-    // minHeight: '600px',
-    overflowY: 'hidden',
+(self as any).MonacoEnvironment = {
+  getWorker(_: unknown, label: string) {
+    if (label === 'json') {
+      return new jsonWorker();
+    }
+    if (label === 'css' || label === 'scss' || label === 'less') {
+      return new cssWorker();
+    }
+    if (label === 'html' || label === 'handlebars' || label === 'razor') {
+      return new htmlWorker();
+    }
+    if (label === 'typescript' || label === 'javascript') {
+      return new tsWorker();
+    }
+    return new editorWorker();
   },
-  terminalCode: {
-    color: theme.palette.common.white,
-  },
-  terminal: {
-    backgroundColor: theme.palette.common.black,
-    height: '500px',
-    width: '100%',
-    overflow: 'scroll',
-    marginTop: theme.spacing(3),
-  },
-  containerFormControl: {
-    minWidth: '11rem',
-  },
-  scrollable: {
-    overflowY: 'auto',
-    overflowX: 'hidden',
-  },
-}));
+};
 
 type KubeObjectIsh = Partial<KubeObjectInterface>;
 
 export interface EditorDialogProps extends DialogProps {
-  item: KubeObjectIsh | null;
+  /** The object(s) to edit, or null to make the dialog be in "loading mode". Pass it an empty object if no contents are to be shown when the dialog is first open. */
+  item: KubeObjectIsh | object | object[] | string | null;
+  /** Called when the dialog is closed. */
   onClose: () => void;
-  onSave: ((...args: any[]) => void) | null;
+  /** Called by a component for when the user clicks the save button. When set to "default", internal save logic is applied. */
+  onSave?: ((...args: any[]) => void) | 'default' | null;
+  /** Called when the editor's contents change. */
   onEditorChanged?: ((newValue: string) => void) | null;
+  /** The function to open the dialog. */
+  setOpen?: (open: boolean) => void;
+  /** The label to use for the save button. */
   saveLabel?: string;
+  /** The error message to display. */
   errorMessage?: string;
+  /** The dialog title. */
   title?: string;
+  /** Extra optional actions. */
+  actions?: React.ReactNode[];
 }
 
 export default function EditorDialog(props: EditorDialogProps) {
-  const { item, onClose, onSave, onEditorChanged, saveLabel, errorMessage, title, ...other } =
-    props;
+  const {
+    item,
+    onClose,
+    onSave = 'default',
+    onEditorChanged,
+    setOpen,
+    saveLabel,
+    errorMessage,
+    title,
+    actions = [],
+    ...other
+  } = props;
   const editorOptions = {
     selectOnLineNumbers: true,
     readOnly: isReadOnly(),
+    automaticLayout: true,
   };
   const { i18n } = useTranslation();
   const [lang, setLang] = React.useState(i18n.language);
-  const classes = useStyle();
-  const theme = useTheme();
-  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
   const themeName = getThemeName();
 
-  const [originalCode, setOriginalCode] = React.useState('');
-  const [code, setCode] = React.useState(originalCode);
-  const [previousVersion, setPreviousVersion] = React.useState('');
+  const initialCode = typeof item === 'string' ? item : yaml.dump(item || {});
+  const originalCodeRef = React.useRef({ code: initialCode, format: item ? 'yaml' : '' });
+  const [code, setCode] = React.useState(originalCodeRef.current);
+  const codeRef = React.useRef(code);
+  const lastCodeCheckHandler = React.useRef(0);
+  const previousVersionRef = React.useRef(
+    isKubeObjectIsh(item) ? item?.metadata?.resourceVersion || '' : ''
+  );
   const [error, setError] = React.useState('');
-  const [docSpecs, setDocSpecs] = React.useState({});
-  const { t } = useTranslation('resource');
+  const [docSpecs, setDocSpecs] = React.useState<
+    KubeObjectInterface | KubeObjectInterface[] | null
+  >([]);
+  const { t } = useTranslation();
 
   const [useSimpleEditor, setUseSimpleEditorState] = React.useState(() => {
     const localData = localStorage.getItem('useSimpleEditor');
     return localData ? JSON.parse(localData) : false;
   });
+  const dispatchCreateEvent = useEventCallback(HeadlampEventType.CREATE_RESOURCE);
+  const dispatch: AppDispatch = useDispatch();
 
   function setUseSimpleEditor(data: boolean) {
     localStorage.setItem('useSimpleEditor', JSON.stringify(data));
     setUseSimpleEditorState(data);
   }
 
+  function isKubeObjectIsh(item: any): item is KubeObjectIsh {
+    return item && typeof item === 'object' && !Array.isArray(item) && 'metadata' in item;
+  }
+
+  // Update the code when the item changes, but only if the code hasn't been touched.
   React.useEffect(() => {
-    if (!item) {
+    if (!item || Object.keys(item || {}).length === 0) {
+      const defaultCode = '# Enter your YAML or JSON here';
+      originalCodeRef.current = { code: defaultCode, format: 'yaml' };
+      setCode({ code: defaultCode, format: 'yaml' });
       return;
     }
 
-    const itemCode = yaml.dump(item);
-    if (itemCode !== originalCode) {
-      setOriginalCode(itemCode);
+    // Determine the format (YAML or JSON) and serialize to string
+    const format = looksLikeJson(originalCodeRef.current.code) ? 'json' : 'yaml';
+    const itemCode = format === 'json' ? JSON.stringify(item) : yaml.dump(item);
+
+    // Update the code if the item representation has changed
+    if (itemCode !== originalCodeRef.current.code) {
+      originalCodeRef.current = { code: itemCode, format };
+      setCode({ code: itemCode, format });
     }
 
-    if (!item.metadata) {
-      return;
-    }
+    // Additional handling for Kubernetes objects
+    if (isKubeObjectIsh(item) && item.metadata) {
+      const resourceVersionsDiffer =
+        (previousVersionRef.current || '') !== (item.metadata!.resourceVersion || '');
+      // Only change if the code hasn't been touched.
+      // We use the codeRef in this effect instead of the code, because we need to access the current
+      // state of the code but we don't want to trigger a re-render when we set the code here.
+      if (resourceVersionsDiffer || codeRef.current.code === originalCodeRef.current.code) {
+        // Prevent updating to the same code, which would lead to an infinite loop.
+        if (codeRef.current.code !== itemCode) {
+          setCode({ code: itemCode, format: originalCodeRef.current.format });
+        }
 
-    // Only change if the code hasn't been touched.
-    if (previousVersion !== item.metadata!.resourceVersion || code === originalCode) {
-      setCode(itemCode);
-      if (previousVersion !== item.metadata!.resourceVersion) {
-        setPreviousVersion(item!.metadata!.resourceVersion);
+        if (resourceVersionsDiffer && !!item.metadata!.resourceVersion) {
+          previousVersionRef.current = item.metadata!.resourceVersion;
+        }
       }
     }
-  }, [item, previousVersion, originalCode, code]);
+  }, [item]);
+
+  React.useEffect(() => {
+    codeRef.current = code;
+  }, [code]);
 
   React.useEffect(() => {
     i18n.on('languageChanged', setLang);
     return () => {
+      // Stop the timeout from trying to use the component after it's been unmounted.
+      clearTimeout(lastCodeCheckHandler.current);
+
       i18n.off('languageChanged', setLang);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,25 +189,85 @@ export default function EditorDialog(props: EditorDialogProps) {
     return onSave === null;
   }
 
-  function onChange(value: string | undefined): void {
-    setCode(value as string);
-
-    if (error && getObjectFromCode(value as string)) {
-      setError('');
+  function looksLikeJson(code: string) {
+    const trimmedCode = code.trimLeft();
+    const firstChar = !!trimmedCode ? trimmedCode[0] : '';
+    if (['{', '['].includes(firstChar)) {
+      return true;
     }
+    return false;
+  }
+
+  function onChange(value: string | undefined): void {
+    // Clear any ongoing attempts to check the code.
+    window.clearTimeout(lastCodeCheckHandler.current);
+
+    // Only check the code for errors after the user has stopped typing for a moment.
+    lastCodeCheckHandler.current = window.setTimeout(() => {
+      const { error: err, format } = getObjectsFromCode({
+        code: value || '',
+        format: originalCodeRef.current.format,
+      });
+      if (code.format !== format) {
+        setCode(currentCode => ({ code: currentCode.code || '', format }));
+      }
+
+      if (error !== (err?.message || '')) {
+        setError(err?.message || '');
+      }
+    }, 500); // ms
+
+    setCode(currentCode => ({ code: value as string, format: currentCode.format }));
 
     if (onEditorChanged) {
       onEditorChanged(value as string);
     }
   }
 
-  function getObjectFromCode(code: string): KubeObjectInterface | null {
-    try {
-      const codeObj = yaml.load(code);
-      return codeObj as KubeObjectInterface;
-    } catch (e) {
-      return null;
+  function getObjectsFromCode(codeInfo: typeof originalCodeRef.current): {
+    obj: KubeObjectInterface[] | null;
+    format: string;
+    error: Error | null;
+  } {
+    const { code, format } = codeInfo;
+    const res: { obj: KubeObjectInterface[] | null; format: string; error: Error | null } = {
+      obj: null,
+      format,
+      error: null,
+    };
+
+    if (!format || (!res.obj && looksLikeJson(code))) {
+      res.format = 'json';
+      try {
+        let helperArr = [];
+        const parsedCode = JSON.parse(code);
+        if (!Array.isArray(parsedCode)) {
+          helperArr.push(parsedCode);
+        } else {
+          helperArr = parsedCode;
+        }
+        res.obj = helperArr;
+        return res;
+      } catch (e) {
+        res.error = new Error((e as Error).message || t('Invalid JSON'));
+      }
     }
+
+    if (!res.obj) {
+      res.format = 'yaml';
+      try {
+        res.obj = yaml.loadAll(code) as KubeObjectInterface[];
+        return res;
+      } catch (e) {
+        res.error = new Error((e as Error).message || t('Invalid YAML'));
+      }
+    }
+
+    if (!!res.obj) {
+      res.error = null;
+    }
+
+    return res;
   }
 
   function handleTabChange(tabIndex: number) {
@@ -155,48 +276,115 @@ export default function EditorDialog(props: EditorDialogProps) {
       return;
     }
 
-    const codeObj = getObjectFromCode(code);
-
-    const { kind, apiVersion } = (codeObj || {}) as KubeObjectInterface;
-    if (codeObj === null || (!!kind && !!apiVersion)) {
-      setDocSpecs({
-        error: codeObj === null,
-        kind,
-        apiVersion,
-      });
-    }
+    const { obj: codeObjs } = getObjectsFromCode(code);
+    setDocSpecs(codeObjs);
   }
 
   function onUndo() {
-    setCode(originalCode);
+    setCode(originalCodeRef.current);
   }
+
+  const applyFunc = async (newItems: KubeObjectInterface[], clusterName: string) => {
+    await Promise.allSettled(newItems.map(newItem => apply(newItem, clusterName))).then(
+      (values: any) => {
+        values.forEach((value: any, index: number) => {
+          if (value.status === 'rejected') {
+            let msg;
+            const kind = newItems[index].kind;
+            const name = newItems[index].metadata.name;
+            const apiVersion = newItems[index].apiVersion;
+            if (newItems.length === 1) {
+              msg = t('translation|Failed to create {{ kind }} {{ name }}.', { kind, name });
+            } else {
+              msg = t('translation|Failed to create {{ kind }} {{ name }} in {{ apiVersion }}.', {
+                kind,
+                name,
+                apiVersion,
+              });
+            }
+            setError(msg);
+            setOpen?.(true);
+            // throw msg;
+            throw new Error(msg);
+          }
+        });
+      }
+    );
+  };
 
   function handleSave() {
     // Verify the YAML even means anything before trying to use it.
-    if (!getObjectFromCode(code)) {
-      setError(t("Error parsing the code. Please verify it's valid YAML!"));
+    const { obj, format, error } = getObjectsFromCode(code);
+    if (!!error) {
+      setError(t('Error parsing the code: {{error}}', { error: error.message }));
       return;
     }
 
-    onSave!(getObjectFromCode(code));
+    if (format !== code.format) {
+      setCode(currentCode => ({ code: currentCode.code, format }));
+    }
+
+    if (!getObjectsFromCode(code)) {
+      setError(t("Error parsing the code. Please verify it's valid YAML or JSON!"));
+      return;
+    }
+
+    const newItemDefs = obj!;
+
+    if (typeof onSave === 'string' && onSave === 'default') {
+      const resourceNames = newItemDefs.map(newItemDef => newItemDef.metadata.name);
+      const clusterName = getCluster() || '';
+
+      dispatch(
+        clusterAction(() => applyFunc(newItemDefs, clusterName), {
+          startMessage: t('translation|Applying {{ newItemName }}…', {
+            newItemName: resourceNames.join(','),
+          }),
+          cancelledMessage: t('translation|Cancelled applying {{ newItemName }}.', {
+            newItemName: resourceNames.join(','),
+          }),
+          successMessage: t('translation|Applied {{ newItemName }}.', {
+            newItemName: resourceNames.join(','),
+          }),
+          errorMessage: t('translation|Failed to apply {{ newItemName }}.', {
+            newItemName: resourceNames.join(','),
+          }),
+          cancelUrl: location.pathname,
+        })
+      );
+
+      dispatchCreateEvent({
+        status: EventStatus.CONFIRMED,
+      });
+
+      onClose();
+    } else if (typeof onSave === 'function') {
+      onSave!(obj);
+    }
   }
 
   function makeEditor() {
     // @todo: monaco editor does not support pt, ta, hi amongst various other langs.
     if (['de', 'es', 'fr', 'it', 'ja', 'ko', 'ru', 'zh-cn', 'zh-tw'].includes(lang)) {
-      loader.config({ 'vs/nls': { availableLanguages: { '*': lang } } });
+      loader.config({ 'vs/nls': { availableLanguages: { '*': lang } }, monaco });
+    } else {
+      loader.config({ monaco });
     }
 
     return useSimpleEditor ? (
       <Box paddingTop={2} height="100%">
-        <SimpleEditor language="yaml" value={code} onChange={onChange} />
+        <SimpleEditor
+          language={originalCodeRef.current.format || 'yaml'}
+          value={code.code}
+          onChange={onChange}
+        />
       </Box>
     ) : (
       <Box paddingTop={2} height="100%">
         <Editor
-          language="yaml"
+          language={originalCodeRef.current.format || 'yaml'}
           theme={themeName === 'dark' ? 'vs-dark' : 'light'}
-          value={code}
+          value={code.code}
           options={editorOptions}
           onChange={onChange}
           height="600px"
@@ -208,43 +396,57 @@ export default function EditorDialog(props: EditorDialogProps) {
   const errorLabel = error || errorMessage;
   let dialogTitle = title;
   if (!dialogTitle && item) {
-    const itemName = item.metadata?.name || t('New Object');
+    const itemName = (isKubeObjectIsh(item) && item.metadata?.name) || t('New Object');
     dialogTitle = isReadOnly()
-      ? t('resource|View: {{ itemName }}', { itemName })
-      : t('resource|Edit: {{ itemName }}', { itemName });
+      ? t('translation|View: {{ itemName }}', { itemName })
+      : t('translation|Edit: {{ itemName }}', { itemName });
   }
 
-  const focusedRef = React.useCallback(node => {
-    if (node !== null) {
-      node.setAttribute('tabindex', '-1');
-      node.focus();
-    }
-  }, []);
+  const dialogTitleId = useId('editor-dialog-title-');
+
+  if (!other.open && !other.keepMounted) {
+    return null;
+  }
 
   return (
     <Dialog
+      title={dialogTitle}
       aria-busy={!item}
       maxWidth="lg"
       scroll="paper"
       fullWidth
-      fullScreen={fullScreen}
+      withFullScreen
       onClose={onClose}
       {...other}
-      aria-labelledby="editor-dialog-title"
+      aria-labelledby={dialogTitleId}
+      titleProps={{
+        id: dialogTitleId,
+      }}
     >
       {!item ? (
         <Loader title={t('Loading editor')} />
       ) : (
         <React.Fragment>
-          <Grid container spacing={0}>
-            <Grid item xs={6}>
-              <DialogTitle id="editor-dialog-title" ref={focusedRef}>
-                {dialogTitle}
-              </DialogTitle>
-            </Grid>
-            <Grid xs={6} item>
-              <Box display="flex" flexDirection="row-reverse">
-                <Box p={1}>
+          <DialogContent
+            sx={{
+              height: '80%',
+              overflowY: 'hidden',
+            }}
+          >
+            <Box py={1}>
+              <Grid container spacing={2} justifyContent="space-between">
+                {
+                  actions.length > 0 ? (
+                    actions.map((action, i) => (
+                      <Grid item key={`editor_action_${i}`}>
+                        {action}
+                      </Grid>
+                    ))
+                  ) : (
+                    <Grid item></Grid>
+                  ) // Just to keep the layout consistent.
+                }
+                <Grid item>
                   <FormGroup row>
                     <FormControlLabel
                       control={
@@ -254,32 +456,35 @@ export default function EditorDialog(props: EditorDialogProps) {
                           name="useSimpleEditor"
                         />
                       }
-                      label="Use minimal editor"
+                      label={t('Use minimal editor')}
                     />
                   </FormGroup>
-                </Box>
-              </Box>
-            </Grid>
-          </Grid>
-
-          <DialogContent className={classes.dialogContent}>
+                </Grid>
+              </Grid>
+            </Box>
             {isReadOnly() ? (
               makeEditor()
             ) : (
               <Tabs
                 onTabChanged={handleTabChange}
-                tabProps={{
-                  centered: true,
-                }}
+                ariaLabel={t('translation|Editor')}
                 tabs={[
                   {
-                    label: t('frequent|Editor'),
+                    label: t('translation|Editor'),
                     component: makeEditor(),
                   },
                   {
-                    label: t('frequent|Documentation'),
+                    label: t('translation|Documentation'),
                     component: (
-                      <Box p={2} className={classes.scrollable} height="600px">
+                      <Box
+                        p={2}
+                        sx={{
+                          overflowY: 'auto',
+                          overflowX: 'hidden',
+                        }}
+                        maxHeight={600}
+                        height={600}
+                      >
                         <DocsViewer docSpecs={docSpecs} />
                       </Box>
                     ),
@@ -291,33 +496,33 @@ export default function EditorDialog(props: EditorDialogProps) {
           <DialogActions>
             {!isReadOnly() && (
               <ConfirmButton
-                disabled={originalCode === code}
+                disabled={originalCodeRef.current.code === code.code}
                 color="secondary"
-                aria-label={t('frequent|Undo')}
+                aria-label={t('translation|Undo')}
                 onConfirm={onUndo}
-                confirmTitle={t('frequent|Are you sure?')}
+                confirmTitle={t('translation|Are you sure?')}
                 confirmDescription={t(
                   'This will discard your changes in the editor. Do you want to proceed?'
                 )}
                 // @todo: aria-controls should point to the textarea id
               >
-                {t('frequent|Undo Changes')}
+                {t('translation|Undo Changes')}
               </ConfirmButton>
             )}
             <div style={{ flex: '1 0 0' }} />
             {errorLabel && <Typography color="error">{errorLabel}</Typography>}
             <div style={{ flex: '1 0 0' }} />
             <Button onClick={onClose} color="primary">
-              {t('frequent|Close')}
+              {t('translation|Close')}
             </Button>
             {!isReadOnly() && (
               <Button
                 onClick={handleSave}
                 color="primary"
-                disabled={originalCode === code || !!error}
+                disabled={originalCodeRef.current.code === code.code || !!error}
                 // @todo: aria-controls should point to the textarea id
               >
-                {saveLabel || t('frequent|Save & Apply')}
+                {saveLabel || t('translation|Save & Apply')}
               </Button>
             )}
           </DialogActions>

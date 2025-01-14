@@ -1,60 +1,103 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import helpers from '../../helpers';
+import { useCluster } from '../../lib/k8s';
 import Namespace from '../../lib/k8s/namespace';
-import { useFilterFunc } from '../../lib/util';
 import { Link } from '../common';
 import { StatusLabel } from '../common/Label';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import ResourceListView from '../common/Resource/ResourceListView';
+import {
+  ResourceTableFromResourceClassProps,
+  ResourceTableProps,
+} from '../common/Resource/ResourceTable';
+import CreateNamespaceButton from './CreateNamespaceButton';
 
 export default function NamespacesList() {
-  const [namespaces, error] = Namespace.useList();
-  const filterFunc = useFilterFunc();
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
+  const cluster = useCluster();
+  // Use the metadata.name field to match the expected format of the ResourceTable component.
+  const [allowedNamespaces, setAllowedNamespaces] = React.useState<
+    { metadata: { name: string } }[]
+  >([]);
+
+  React.useEffect(() => {
+    if (cluster) {
+      const namespaces = helpers.loadClusterSettings(cluster)?.allowedNamespaces || [];
+      setAllowedNamespaces(
+        namespaces.map(namespace => ({
+          metadata: {
+            name: namespace,
+          },
+        }))
+      );
+    }
+  }, [cluster]);
 
   function makeStatusLabel(namespace: Namespace) {
     const status = namespace.status.phase;
     return <StatusLabel status={status === 'Active' ? 'success' : 'error'}>{status}</StatusLabel>;
   }
 
+  const resourceTableProps:
+    | ResourceTableProps<Namespace>
+    | ResourceTableFromResourceClassProps<typeof Namespace> = React.useMemo(() => {
+    if (allowedNamespaces.length > 0) {
+      return {
+        columns: [
+          {
+            id: 'name',
+            label: t('translation|Name'),
+            getValue: ns => ns.metadata.name,
+            render: ({ metadata }) => (
+              <Link
+                routeName={'namespace'}
+                params={{
+                  name: metadata.name,
+                }}
+              >
+                {metadata.name}
+              </Link>
+            ),
+          },
+          'cluster',
+          {
+            id: 'status',
+            label: t('translation|Status'),
+            getValue: () => 'Unknown',
+          },
+          {
+            id: 'age',
+            label: t('translation|Age'),
+            getValue: () => 'Unknown',
+          },
+        ],
+        data: allowedNamespaces as unknown as Namespace[],
+      } satisfies ResourceTableProps<Namespace>;
+    }
+    return {
+      resourceClass: Namespace,
+      columns: [
+        'name',
+        'cluster',
+        {
+          id: 'status',
+          label: t('translation|Status'),
+          getValue: ns => ns.status.phase,
+          render: makeStatusLabel,
+        },
+        'age',
+      ],
+    } satisfies ResourceTableFromResourceClassProps<typeof Namespace>;
+  }, [allowedNamespaces]);
+
   return (
-    <SectionBox
-      title={<SectionFilterHeader title={t('Namespaces')} noNamespaceFilter headerStyle="main" />}
-    >
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={Namespace.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: namespace => <Link kubeObject={namespace} />,
-            sort: (n1: Namespace, n2: Namespace) => {
-              if (n1.metadata.name < n2.metadata.name) {
-                return -1;
-              } else if (n1.metadata.name > n2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
-          },
-          {
-            label: t('Status'),
-            getter: makeStatusLabel,
-            sort: (namespace: Namespace) => namespace.status.phase,
-          },
-          {
-            label: t('frequent|Age'),
-            getter: namespace => namespace.getAge(),
-            sort: (n1: Namespace, n2: Namespace) =>
-              new Date(n2.metadata.creationTimestamp).getTime() -
-              new Date(n1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={namespaces}
-        defaultSortingColumn={3}
-      />
-    </SectionBox>
+    <ResourceListView
+      title={t('Namespaces')}
+      headerProps={{
+        titleSideActions: [<CreateNamespaceButton />],
+        noNamespaceFilter: true,
+      }}
+      {...(resourceTableProps as ResourceTableProps<Namespace>)}
+    />
   );
 }

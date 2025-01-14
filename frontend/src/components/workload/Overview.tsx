@@ -1,19 +1,20 @@
-import Grid from '@material-ui/core/Grid';
-import React from 'react';
+import Grid from '@mui/material/Grid';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
-import { Workload } from '../../lib/k8s/cluster';
 import CronJob from '../../lib/k8s/cronJob';
 import DaemonSet from '../../lib/k8s/daemonSet';
 import Deployment from '../../lib/k8s/deployment';
 import Job from '../../lib/k8s/job';
+import Pod from '../../lib/k8s/pod';
 import ReplicaSet from '../../lib/k8s/replicaSet';
 import StatefulSet from '../../lib/k8s/statefulSet';
-import { getReadyReplicas, getTotalReplicas, timeAgo, useFilterFunc } from '../../lib/util';
-import { PageGrid, ResourceLink } from '../common/Resource';
+import { WorkloadClass } from '../../lib/k8s/Workload';
+import { Workload } from '../../lib/k8s/Workload';
+import { getReadyReplicas, getTotalReplicas } from '../../lib/util';
+import Link from '../common/Link';
+import { PageGrid } from '../common/Resource';
+import ResourceListView from '../common/Resource/ResourceListView';
 import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
 import { WorkloadCircleChart } from './Charts';
 
 interface WorkloadDict {
@@ -21,20 +22,28 @@ interface WorkloadDict {
 }
 
 export default function Overview() {
-  const [workloadsData, dispatch] = React.useReducer(setWorkloads, {});
-  const location = useLocation();
-  const filterFunc = useFilterFunc(['.jsonData.kind']);
+  const [pods] = Pod.useList();
+  const [deployments] = Deployment.useList();
+  const [statefulSets] = StatefulSet.useList();
+  const [daemonSets] = DaemonSet.useList();
+  const [replicaSets] = ReplicaSet.useList();
+  const [jobs] = Job.useList();
+  const [cronJobs] = CronJob.useList();
+
+  const workloadsData: WorkloadDict = useMemo(
+    () => ({
+      Pod: pods ?? [],
+      Deployment: deployments ?? [],
+      StatefulSet: statefulSets ?? [],
+      DaemonSet: daemonSets ?? [],
+      ReplicaSet: replicaSets ?? [],
+      Job: jobs ?? [],
+      CronJob: cronJobs ?? [],
+    }),
+    [pods, deployments, statefulSets, daemonSets, replicaSets, jobs, cronJobs]
+  );
+
   const { t } = useTranslation('glossary');
-
-  function setWorkloads(
-    workloads: WorkloadDict,
-    { items, kind }: { items: Workload[]; kind: string }
-  ) {
-    const data = { ...workloads };
-    data[kind] = items;
-
-    return data;
-  }
 
   function getPods(item: Workload) {
     return `${getReadyReplicas(item)}/${getTotalReplicas(item)}`;
@@ -49,84 +58,94 @@ export default function Overview() {
     return totalReplicasDiff;
   }
 
-  function getJointItems() {
+  // All items except the pods since those shouldn't be shown in the table (only the chart).
+  const jointItems = React.useMemo(() => {
     let joint: Workload[] = [];
-    for (const items of Object.values(workloadsData)) {
+
+    // Get all items except the pods since those shouldn't be shown in the table (only the chart).
+    for (const [key, items] of Object.entries(workloadsData)) {
+      if (key === 'Pod') {
+        continue;
+      }
       joint = joint.concat(items);
     }
-    return joint;
-  }
 
-  const workloads = [DaemonSet, Deployment, Job, CronJob, ReplicaSet, StatefulSet];
-  workloads.forEach(workloadClass => {
-    workloadClass.useApiList((items: InstanceType<typeof workloadClass>[]) =>
-      dispatch({ items, kind: workloadClass.className })
-    );
-  });
+    joint = joint.filter(Boolean);
+
+    // Return null if no items are yet loaded, so we show the spinner in the table.
+    if (joint.length === 0) {
+      return null;
+    }
+
+    return joint;
+  }, [workloadsData]);
+
+  const workloads: WorkloadClass[] = [
+    Pod,
+    Deployment,
+    StatefulSet,
+    DaemonSet,
+    ReplicaSet,
+    Job,
+    CronJob,
+  ];
+
+  const workloadLabel = {
+    [Pod.className]: t('glossary|Pods'),
+    [Deployment.className]: t('glossary|Deployments'),
+    [StatefulSet.className]: t('glossary|Stateful Sets'),
+    [DaemonSet.className]: t('glossary|Daemon Sets'),
+    [ReplicaSet.className]: t('glossary|Replica Sets'),
+    [Job.className]: t('glossary|Jobs'),
+    [CronJob.className]: t('glossary|Cron Jobs'),
+  };
+
+  function ChartLink({ workload }: { workload: WorkloadClass }) {
+    return <Link routeName={workload.pluralName}>{workloadLabel[workload.className]}</Link>;
+  }
 
   return (
     <PageGrid>
-      <SectionBox py={2}>
-        <Grid container justifyContent="space-around" alignItems="flex-start" spacing={1}>
-          {workloads.map(({ className: name }) => (
-            <Grid item lg={2} md={4} xs={6} key={name}>
+      <SectionBox py={2} mt={1}>
+        <Grid container justifyContent="flex-start" alignItems="flex-start" spacing={2}>
+          {workloads.map(workload => (
+            <Grid item lg={3} md={4} xs={6} key={workload.className}>
               <WorkloadCircleChart
-                workloadData={workloadsData[name] || []}
-                // @todo: Use a plural from from the class itself when we have it
-                title={name + 's'}
-                partialLabel={t('frequent|Failed')}
-                totalLabel={t('frequent|Running')}
+                workloadData={workloadsData[workload.className] || null}
+                title={<ChartLink workload={workload} />}
+                partialLabel={t('translation|Failed')}
+                totalLabel={t('translation|Running')}
               />
             </Grid>
           ))}
         </Grid>
       </SectionBox>
-      <SectionBox title={<SectionFilterHeader title={t('Workloads')} />}>
-        <SimpleTable
-          rowsPerPage={[15, 25, 50]}
-          filterFunction={filterFunc}
-          columns={[
-            {
-              label: t('Type'),
-              getter: item => item.kind,
-              sort: true,
-            },
-            {
-              label: t('frequent|Name'),
-              getter: item => (
-                <ResourceLink resource={item} state={{ backLink: { ...location } }} />
-              ),
-              sort: (w1: Workload, w2: Workload) => {
-                if (w1.metadata.name < w2.metadata.name) {
-                  return -1;
-                } else if (w1.metadata.name > w2.metadata.name) {
-                  return 1;
-                }
-                return 0;
-              },
-            },
-            {
-              label: t('glossary|Namespace'),
-              getter: item => item.metadata.namespace,
-              sort: true,
-            },
-            {
-              label: t('Pods'),
-              getter: item => item && getPods(item),
-              sort: sortByReplicas,
-            },
-            {
-              label: t('frequent|Age'),
-              getter: item => timeAgo(item.metadata.creationTimestamp),
-              sort: (w1: Workload, w2: Workload) =>
-                new Date(w2.metadata.creationTimestamp).getTime() -
-                new Date(w1.metadata.creationTimestamp).getTime(),
-            },
-          ]}
-          data={getJointItems()}
-          defaultSortingColumn={5}
-        />
-      </SectionBox>
+      <ResourceListView
+        title={t('Workloads')}
+        columns={[
+          'kind',
+          {
+            id: 'name',
+            label: t('translation|Name'),
+            getValue: item => item.metadata.name,
+            render: item => <Link kubeObject={item} />,
+          },
+          'namespace',
+          'cluster',
+          {
+            id: 'pods',
+            label: t('Pods'),
+            getValue: item => item && getPods(item),
+            sort: sortByReplicas,
+          },
+          'age',
+        ]}
+        data={jointItems}
+        headerProps={{
+          noNamespaceFilter: false,
+        }}
+        id="headlamp-workloads"
+      />
     </PageGrid>
   );
 }

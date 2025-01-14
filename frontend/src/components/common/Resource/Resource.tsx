@@ -1,61 +1,78 @@
 import { Icon } from '@iconify/react';
-import { Button, InputLabel, Theme } from '@material-ui/core';
-import Box from '@material-ui/core/Box';
-import Divider from '@material-ui/core/Divider';
-import Grid, { GridProps } from '@material-ui/core/Grid';
-import IconButton from '@material-ui/core/IconButton';
-import Input, { InputProps } from '@material-ui/core/Input';
-import { TextFieldProps } from '@material-ui/core/TextField';
-import Typography from '@material-ui/core/Typography';
-import { makeStyles, useTheme } from '@material-ui/styles';
 import Editor from '@monaco-editor/react';
+import { InputLabel } from '@mui/material';
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import Grid, { GridProps, GridSize } from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
+import Input, { InputProps } from '@mui/material/Input';
+import Paper from '@mui/material/Paper';
+import { BaseTextFieldProps } from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/system';
+import { Location } from 'history';
 import { Base64 } from 'js-base64';
-import _ from 'lodash';
-import * as monaco from 'monaco-editor';
-import React, { PropsWithChildren } from 'react';
+import _, { has } from 'lodash';
+import React, { PropsWithChildren, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { generatePath, Link as RouterLink, NavLinkProps, useLocation } from 'react-router-dom';
-import DetailsViewPluginRenderer from '../../../helpers/renderHelpers';
+import { generatePath, NavLinkProps, useLocation } from 'react-router-dom';
+import YAML from 'yaml';
+import { labelSelectorToQuery, ResourceClasses } from '../../../lib/k8s';
 import { ApiError } from '../../../lib/k8s/apiProxy';
-import {
-  KubeCondition,
-  KubeContainer,
-  KubeContainerStatus,
-  KubeObject,
-  KubeObjectInterface,
-} from '../../../lib/k8s/cluster';
-import Pod, { KubePod } from '../../../lib/k8s/pod';
+import { KubeCondition, KubeContainer, KubeContainerStatus } from '../../../lib/k8s/cluster';
+import { KubeEvent } from '../../../lib/k8s/event';
+import { KubeObject } from '../../../lib/k8s/KubeObject';
+import { KubeObjectInterface } from '../../../lib/k8s/KubeObject';
+import { KubeObjectClass } from '../../../lib/k8s/KubeObject';
+import Pod, { KubePod, KubeVolume } from '../../../lib/k8s/pod';
 import { createRouteURL, RouteURLProps } from '../../../lib/router';
 import { getThemeName } from '../../../lib/themes';
+import { localeDate, useId } from '../../../lib/util';
+import { HeadlampEventType, useEventCallback } from '../../../redux/headlampEventSlice';
 import { useTypedSelector } from '../../../redux/reducers/reducers';
-import Loader from '../../common/Loader';
+import { useHasPreviousRoute } from '../../App/RouteSwitcher';
 import { SectionBox } from '../../common/SectionBox';
-import SectionHeader, { HeaderStyleProps } from '../../common/SectionHeader';
-import SimpleTable, { NameValueTable, NameValueTableRow } from '../../common/SimpleTable';
+import SimpleTable, { NameValueTable } from '../../common/SimpleTable';
+import {
+  DefaultDetailsViewSection,
+  DetailsViewSection,
+} from '../../DetailsViewSection/detailsViewSectionSlice';
 import { PodListProps, PodListRenderer } from '../../pod/List';
-import { LightTooltip } from '..';
+import { LightTooltip, Loader, ObjectEventList } from '..';
+import BackLink from '../BackLink';
 import Empty from '../EmptyContent';
-import { DateLabel, HoverInfoLabel, StatusLabel, StatusLabelProps } from '../Label';
+import ErrorBoundary from '../ErrorBoundary';
+import InnerTable from '../InnerTable';
+import { DateLabel, HoverInfoLabel, StatusLabel, StatusLabelProps, ValueLabel } from '../Label';
 import Link, { LinkProps } from '../Link';
-import { useMetadataDisplayStyles } from '.';
-import DeleteButton from './DeleteButton';
-import EditButton from './EditButton';
+import { metadataStyles } from '.';
+import { MainInfoSection, MainInfoSectionProps } from './MainInfoSection/MainInfoSection';
+import { MainInfoHeader } from './MainInfoSection/MainInfoSectionHeader';
 import { MetadataDictGrid, MetadataDisplay } from './MetadataDisplay';
+import PortForward from './PortForward';
 
-interface ResourceLinkProps extends Omit<LinkProps, 'routeName' | 'params'> {
+export { MainInfoSection };
+export type { MainInfoSectionProps };
+
+export interface ResourceLinkProps extends Omit<LinkProps, 'routeName' | 'params'> {
   name?: string;
   routeName?: string;
   routeParams?: RouteURLProps;
-  resource: KubeObjectInterface;
+  resource: KubeObject<any>;
 }
 
 export function ResourceLink(props: ResourceLinkProps) {
   const {
+    resource,
     routeName = props.resource.kind,
-    routeParams = props.resource.metadata as RouteURLProps,
+    routeParams = { ...props.resource.metadata } as RouteURLProps,
     name = props.resource.metadata.name,
     state,
   } = props;
+
+  if (!!resource.cluster) {
+    routeParams.cluster = resource.cluster;
+  }
 
   return (
     <Link routeName={routeName} params={routeParams} state={state}>
@@ -64,160 +81,288 @@ export function ResourceLink(props: ResourceLinkProps) {
   );
 }
 
-interface MainInfoSectionProps {
-  resource: KubeObject | null;
-  headerSection?: ((resource: KubeObject | null) => React.ReactNode) | React.ReactNode;
-  title?: string;
-  extraInfo?:
-    | ((resource: KubeObject | null) => NameValueTableRow[] | null)
-    | NameValueTableRow[]
-    | null;
-  actions?: ((resource: KubeObject | null) => React.ReactNode[] | null) | React.ReactNode[] | null;
-  headerStyle?: HeaderStyleProps['headerStyle'];
-  noDefaultActions?: boolean;
-  backLink?: string | ReturnType<typeof useLocation> | null;
-  error?: string | Error | null;
-}
-
-export function MainInfoSection(props: MainInfoSectionProps) {
-  const {
-    resource,
-    headerSection,
-    title,
-    extraInfo = [],
-    actions = [],
-    headerStyle = 'main',
-    noDefaultActions = false,
-    backLink,
-    error = null,
-  } = props;
-  const headerActions = useTypedSelector(state => state.ui.views.details.headerActions);
-  const { t } = useTranslation('frequent');
-
-  function getHeaderActions() {
-    return React.Children.toArray(
-      Object.values(headerActions).map(action => action({ item: resource }))
-    );
-  }
-
-  let defaultActions: React.ReactNode[] | null = [];
-
-  if (!noDefaultActions && resource) {
-    defaultActions = [<EditButton item={resource} />, <DeleteButton item={resource} />];
-  }
-
-  const propsHeaderActions = typeof actions === 'function' ? actions(resource) || [] : actions;
-
-  let header: React.ReactNode = [];
-  if (typeof headerSection === 'function') {
-    header = headerSection(resource);
-  } else {
-    header = headerSection;
-  }
-
-  return (
-    <>
-      {(backLink || resource) && (
-        <Button
-          startIcon={<Icon icon="mdi:chevron-left" />}
-          size="small"
-          component={RouterLink}
-          to={backLink || createRouteURL(resource.listRoute)}
-        >
-          <Typography style={{ paddingTop: '3px' }}>{t('frequent|Back')}</Typography>
-        </Button>
-      )}
-      <SectionBox
-        aria-busy={resource === null}
-        aria-live="polite"
-        title={
-          <SectionHeader
-            title={title || (resource ? resource.kind : '')}
-            headerStyle={headerStyle}
-            actions={getHeaderActions()
-              .concat(React.Children.toArray(propsHeaderActions))
-              .concat(defaultActions)}
-          />
-        }
-      >
-        {resource === null ? (
-          !!error ? (
-            <Empty color="error">{error.toString()}</Empty>
-          ) : (
-            <Loader title={t('frequent|Loading resource data')} />
-          )
-        ) : (
-          <React.Fragment>
-            {header}
-            <MetadataDisplay resource={resource} extraRows={extraInfo} />
-          </React.Fragment>
-        )}
-      </SectionBox>
-    </>
-  );
-}
-
-interface DetailsGridProps extends PropsWithChildren<Omit<MainInfoSectionProps, 'resource'>> {
-  resourceType: KubeObject;
+export interface DetailsGridProps<T extends KubeObjectClass>
+  extends PropsWithChildren<Omit<MainInfoSectionProps<InstanceType<T>>, 'resource'>> {
+  /** Resource type to fetch (from the ResourceClasses). */
+  resourceType: T;
+  /** Name of the resource. */
   name: string;
+  /** Namespace of the resource. If not provided, it's assumed the resource is not namespaced. */
   namespace?: string;
-  sectionsFunc?: (item: KubeObject) => React.ReactNode;
+  /** Sections to show in the details grid (besides the default ones). */
+  extraSections?:
+    | ((item: InstanceType<T>) => boolean | DetailsViewSection[] | ReactNode[])
+    | boolean
+    | DetailsViewSection[];
+  /** @deprecated Use extraSections instead. */
+  sectionsFunc?: (item: InstanceType<T>) => React.ReactNode | DetailsViewSection[];
+  /** If true, will show the events section. */
+  withEvents?: boolean;
+  /** Called when the resource instance is created/updated, or there is an error. */
+  onResourceUpdate?: (resource: InstanceType<T>, error: ApiError) => void;
 }
 
-export function DetailsGrid(props: DetailsGridProps) {
-  const { sectionsFunc, resourceType, name, namespace, children, ...otherMainInfoSectionProps } =
-    props;
-  const [item, setItem] = React.useState<KubeObject | null>(null);
-  const [error, setError] = React.useState<ApiError | string | null>(null);
+/** Renders the different parts that constibute an actual resource's details view.
+ * Those are: the back link, the header, the main info section, the extra sections, and the events section.
+ */
+export function DetailsGrid<T extends KubeObjectClass>(props: DetailsGridProps<T>) {
+  const {
+    sectionsFunc,
+    resourceType,
+    name,
+    namespace,
+    children,
+    withEvents,
+    extraSections,
+    onResourceUpdate,
+    ...otherMainInfoSectionProps
+  } = props;
+  const { t } = useTranslation();
   const location = useLocation<{ backLink: NavLinkProps['location'] }>();
+  const hasPreviousRoute = useHasPreviousRoute();
+  const detailViews = useTypedSelector(state => state.detailsViewSection.detailsViewSections);
+  const detailViewsProcessors = useTypedSelector(
+    state => state.detailsViewSection.detailsViewSectionsProcessors
+  );
+  const dispatchHeadlampEvent = useEventCallback();
 
-  const backLink: string | undefined = React.useMemo(() => {
+  // This component used to have a MainInfoSection with all these props passed to it, so we're
+  // using them to accomplish the same behavior.
+  const { extraInfo, actions, noDefaultActions, headerStyle, backLink, title, headerSection } =
+    otherMainInfoSectionProps;
+
+  const [item, error] = resourceType.useGet(name, namespace) as [
+    InstanceType<T> | null,
+    ApiError | null
+  ];
+  const prevItemRef = React.useRef<{ uid?: string; version?: string; error?: ApiError | null }>({});
+
+  React.useEffect(() => {
+    if (item) {
+      dispatchHeadlampEvent({
+        type: HeadlampEventType.DETAILS_VIEW,
+        data: {
+          title: item?.jsonData.kind,
+          resource: item,
+          error: error || undefined,
+        },
+      });
+    }
+  }, [item]);
+
+  React.useEffect(() => {
+    // We cannot call this callback more than once on each version of the item, in order to avoid
+    // infinite loops.
+    const prevItem = prevItemRef.current;
+    if (
+      prevItem?.uid === item?.metadata?.uid &&
+      prevItem?.version === item?.metadata?.resourceVersion &&
+      error === prevItem.error
+    ) {
+      return;
+    }
+
+    prevItemRef.current = {
+      uid: item?.metadata?.uid,
+      version: item?.metadata?.resourceVersion,
+      error,
+    };
+    onResourceUpdate?.(item as InstanceType<T>, error!);
+  }, [item, error]);
+
+  const actualBackLink: string | Location | undefined = React.useMemo(() => {
+    if (!!backLink || backLink === '') {
+      return backLink;
+    }
+
     const stateLink = location.state?.backLink || null;
     if (!!stateLink) {
       return generatePath(stateLink.pathname);
     }
 
-    let route;
-    try {
-      route = new resourceType().listRoute;
-    } catch (err) {
-      console.error(
-        `Error creating route for details grid (resource type=${resourceType}): ${err}`
-      );
+    if (!!hasPreviousRoute) {
+      // Will make it go back to the previous route
+      return '';
+    }
 
-      // Let the MainInfoSection handle it.
-      return undefined;
+    let route;
+
+    if (!!item) {
+      route = item.listRoute;
+    } else {
+      try {
+        route = new resourceType({} as any).listRoute;
+      } catch (err) {
+        console.error(
+          `Error creating route for details grid (resource type=${resourceType}): ${err}`
+        );
+
+        // Let the MainInfoSection handle it.
+        return undefined;
+      }
     }
 
     return createRouteURL(route);
-  }, []);
+  }, [item]);
 
-  resourceType.useApiGet(setItem, name, namespace || undefined, (err: ApiError) =>
-    setError(err.message)
-  );
+  const sections: (DetailsViewSection | ReactNode)[] = [];
+
+  // Back link
+  if (!!actualBackLink || actualBackLink === '') {
+    sections.push({
+      id: DefaultDetailsViewSection.BACK_LINK,
+      section: <BackLink to={actualBackLink} />,
+    });
+  }
+
+  // Title / Header
+  sections.push({
+    id: DefaultDetailsViewSection.MAIN_HEADER,
+    section: (
+      <MainInfoHeader
+        title={title}
+        resource={item}
+        actions={actions}
+        noDefaultActions={noDefaultActions}
+        headerStyle={headerStyle}
+      />
+    ),
+  });
+
+  // Error / Loading or Metadata
+  if (item === null) {
+    sections.push(
+      !!error
+        ? {
+            id: DefaultDetailsViewSection.ERROR,
+            section: (
+              <Paper variant="outlined">
+                <Empty color="error">{error.toString()}</Empty>
+              </Paper>
+            ),
+          }
+        : {
+            id: DefaultDetailsViewSection.LOADING,
+            section: <Loader title={t('translation|Loading resource data')} />,
+          }
+    );
+  } else {
+    const mainInfoHeader =
+      typeof headerSection === 'function' ? headerSection(item) : headerSection;
+    sections.push({
+      id: DefaultDetailsViewSection.METADATA,
+      section: (
+        <SectionBox aria-busy={item === null} aria-live="polite">
+          {mainInfoHeader}
+          <MetadataDisplay resource={item} extraRows={extraInfo} />
+        </SectionBox>
+      ),
+    });
+  }
+
+  // Other sections
+  if (!!sectionsFunc) {
+    console.info(
+      `Using legacy sectionsFunc in DetailsGrid for ${
+        title || resourceType + '/' + namespace + '/' + name
+      }. Please use the children, or set up a details view processor.`
+    );
+    sections.push({
+      id: 'LEGACY_SECTIONS_FUNC',
+      section: sectionsFunc(item!) as any,
+    });
+  }
+
+  if (!!extraSections) {
+    let actualExtraSections: (DetailsViewSection | ReactNode)[] = [];
+    if (Array.isArray(extraSections)) {
+      actualExtraSections = extraSections;
+    } else if (typeof extraSections === 'function') {
+      const extraSectionsResult = extraSections(item!) || [];
+      if (Array.isArray(extraSectionsResult)) {
+        actualExtraSections = extraSectionsResult;
+      }
+    }
+
+    sections.push(...actualExtraSections);
+  }
+
+  // Children
+  if (!!children) {
+    sections.push({
+      id: DefaultDetailsViewSection.CHILDREN,
+      section: children,
+    });
+  }
+
+  // Plugin appended details views
+  if (!!detailViews) {
+    sections.push(...detailViews);
+  }
+
+  // Events
+  if (withEvents && item) {
+    sections.push({
+      id: DefaultDetailsViewSection.EVENTS,
+      section: <ObjectEventList object={item} />,
+    });
+  }
+
+  let sectionsProcessed = [...sections];
+  for (const detailViewsProcessor of detailViewsProcessors) {
+    let processorsSections = sectionsProcessed;
+    try {
+      processorsSections = detailViewsProcessor.processor(item, sectionsProcessed);
+      if (!Array.isArray(processorsSections)) {
+        throw new Error(`Invalid return value: ${processorsSections}`);
+      }
+    } catch (err) {
+      console.error(
+        `Error processing details view sections for ${resourceType}/${namespace}/${name}: ${err}`
+      );
+
+      continue;
+    }
+
+    sectionsProcessed = processorsSections;
+  }
 
   return (
-    <PageGrid>
-      <MainInfoSection
-        resource={item}
-        error={error}
-        backLink={backLink}
-        {...otherMainInfoSectionProps}
-      />
-      <>{!!sectionsFunc && sectionsFunc(item)}</>
-      {children}
-      <DetailsViewPluginRenderer resource={item} />
+    <PageGrid
+      sx={theme => ({
+        marginBottom: theme.spacing(2),
+      })}
+    >
+      {React.Children.toArray(
+        sectionsProcessed.map(section => {
+          const Section = has(section, 'section')
+            ? (section as DetailsViewSection).section
+            : section;
+          if (React.isValidElement(Section)) {
+            return <ErrorBoundary>{Section}</ErrorBoundary>;
+          } else if (Section === null) {
+            return null;
+          } else if (typeof Section === 'function') {
+            return (
+              <ErrorBoundary>
+                <Section resource={item} />
+              </ErrorBoundary>
+            );
+          }
+        })
+      )}
     </PageGrid>
   );
 }
 
-interface PageGridProps extends GridProps {
-  sections?: React.ReactNode[];
+export interface PageGridProps extends GridProps {
+  sections?: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export function PageGrid(props: PageGridProps) {
   const { sections = [], children = [], ...other } = props;
-  const childrenArray = React.Children.toArray(children).concat(sections);
+  const childrenArray = React.Children.toArray(children).concat(React.Children.toArray(sections));
   return (
     <Grid container spacing={1} justifyContent="flex-start" alignItems="stretch" {...other}>
       {childrenArray.map((section, i) => (
@@ -229,7 +374,7 @@ export function PageGrid(props: PageGridProps) {
   );
 }
 
-interface SectionGridProps {
+export interface SectionGridProps {
   items: React.ReactNode[];
   useDivider?: boolean;
 }
@@ -249,19 +394,26 @@ export function SectionGrid(props: SectionGridProps) {
   );
 }
 
-export function DataField(props: TextFieldProps) {
-  const { label, value } = props;
+export interface DataFieldProps extends BaseTextFieldProps {
+  disableLabel?: boolean;
+}
+
+export function DataField(props: DataFieldProps) {
+  const { disableLabel, label, value } = props;
   // Make sure we reload after a theme change
   useTheme();
   const themeName = getThemeName();
 
-  function handleEditorDidMount(editor: monaco.editor.IStandaloneCodeEditor) {
+  function handleEditorDidMount(editor: any) {
     const editorElement: HTMLElement | null = editor.getDomNode();
     if (!editorElement) {
       return;
     }
+
     const lineCount = editor.getModel()?.getLineCount() || 1;
-    if (lineCount <= 10) {
+    if (lineCount < 2) {
+      editorElement.style.height = '3vh';
+    } else if (lineCount <= 10) {
       editorElement.style.height = '10vh';
     } else {
       editorElement.style.height = '40vh';
@@ -271,6 +423,19 @@ export function DataField(props: TextFieldProps) {
   let language = (label as string).split('.').pop() as string;
   if (language !== 'json') {
     language = 'yaml';
+  }
+  if (disableLabel === true) {
+    return (
+      <Box borderTop={0} border={1}>
+        <Editor
+          value={value as string}
+          language={language}
+          onMount={handleEditorDidMount}
+          options={{ readOnly: true, lineNumbers: 'off', automaticLayout: true }}
+          theme={themeName === 'dark' ? 'vs-dark' : 'light'}
+        />
+      </Box>
+    );
   }
   return (
     <>
@@ -287,7 +452,7 @@ export function DataField(props: TextFieldProps) {
             value={value as string}
             language={language}
             onMount={handleEditorDidMount}
-            options={{ readOnly: true, lineNumbers: 'off' }}
+            options={{ readOnly: true, lineNumbers: 'off', automaticLayout: true }}
             theme={themeName === 'dark' ? 'vs-dark' : 'light'}
           />
         </Box>
@@ -299,7 +464,7 @@ export function DataField(props: TextFieldProps) {
 export function SecretField(props: InputProps) {
   const { value, ...other } = props;
   const [showPassword, setShowPassword] = React.useState(false);
-  const { t } = useTranslation('frequent');
+  const { t } = useTranslation();
 
   function handleClickShowPassword() {
     setShowPassword(!showPassword);
@@ -313,6 +478,7 @@ export function SecretField(props: InputProps) {
           aria-label={t('toggle field visibility')}
           onClick={handleClickShowPassword}
           onMouseDown={event => event.preventDefault()}
+          size="medium"
         >
           <Icon icon={showPassword ? 'mdi:eye-off' : 'mdi:eye'} />
         </IconButton>
@@ -323,7 +489,7 @@ export function SecretField(props: InputProps) {
           type="password"
           fullWidth
           multiline={showPassword}
-          rowsMax="20"
+          maxRows="20"
           value={showPassword ? Base64.decode(value as string) : '******'}
           {...other}
         />
@@ -332,14 +498,14 @@ export function SecretField(props: InputProps) {
   );
 }
 
-interface ConditionsTableProps {
-  resource: KubeObjectInterface | null;
+export interface ConditionsTableProps {
+  resource: KubeObjectInterface | KubeEvent | null;
   showLastUpdate?: boolean;
 }
 
 export function ConditionsTable(props: ConditionsTableProps) {
   const { resource, showLastUpdate = true } = props;
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   function makeStatusLabel(condition: KubeCondition) {
     let status: StatusLabelProps['status'] = '';
@@ -361,7 +527,7 @@ export function ConditionsTable(props: ConditionsTableProps) {
         getter: makeStatusLabel,
       },
       {
-        label: t('Status'),
+        label: t('translation|Status'),
         getter: condition => condition.status,
       },
       {
@@ -375,7 +541,7 @@ export function ConditionsTable(props: ConditionsTableProps) {
         hide: !showLastUpdate,
       },
       {
-        label: t('Reason'),
+        label: t('translation|Reason'),
         getter: condition =>
           condition.reason ? (
             <HoverInfoLabel label={condition.reason} hoverInfo={condition.message} />
@@ -391,22 +557,21 @@ export function ConditionsTable(props: ConditionsTableProps) {
 
   return (
     <SimpleTable
-      data={(resource && resource.status && resource.status.conditions) || {}}
+      data={(resource && resource.status && resource.status.conditions) || []}
       columns={getColumns()}
     />
   );
 }
 
-interface VolumeMountsProps {
-  mounts?:
-    | {
-        mountPath: string;
-        name: string;
-        readOnly: boolean;
-      }[];
+export interface VolumeMountsProps {
+  mounts?: {
+    mountPath: string;
+    name: string;
+    readOnly: boolean;
+  }[];
 }
 
-function VolumeMounts(props: VolumeMountsProps) {
+export function VolumeMounts(props: VolumeMountsProps) {
   const { mounts } = props;
   const { t } = useTranslation();
   if (!mounts) {
@@ -414,18 +579,18 @@ function VolumeMounts(props: VolumeMountsProps) {
   }
 
   return (
-    <SimpleTable
+    <InnerTable
       columns={[
         {
-          label: t('frequent|Mount Path'),
+          label: t('translation|Mount Path'),
           getter: (data: any) => data.mountPath,
         },
         {
-          label: t('frequent|from'),
+          label: t('translation|from'),
           getter: (data: any) => data.name,
         },
         {
-          label: t('frequent|I/O'),
+          label: t('translation|I/O'),
           getter: (data: any) => (data.readOnly ? 'ReadOnly' : 'ReadWrite'),
         },
       ]}
@@ -434,15 +599,13 @@ function VolumeMounts(props: VolumeMountsProps) {
   );
 }
 
-function LivenessProbes(props: { liveness: KubeContainer['livenessProbe'] }) {
-  const classes = useMetadataDisplayStyles({});
-
+export function LivenessProbes(props: { liveness: KubeContainer['livenessProbe'] }) {
   const { liveness } = props;
 
   function LivenessProbeItem(props: { children: React.ReactNode }) {
     return props.children ? (
       <Box p={0.5}>
-        <Typography className={classes.metadataValueLabel} display="inline">
+        <Typography sx={metadataStyles} display="inline">
           {props.children}
         </Typography>
       </Box>
@@ -477,60 +640,136 @@ function LivenessProbes(props: { liveness: KubeContainer['livenessProbe'] }) {
   );
 }
 
-const useContainerInfoStyles = makeStyles((theme: Theme) => ({
-  imageID: {
-    paddingTop: theme.spacing(1),
-    fontSize: '.95rem',
-  },
-}));
-
 export interface ContainerInfoProps {
   container: KubeContainer;
+  resource: KubeObjectInterface | null;
   status?: Omit<KubePod['status']['KubeContainerStatus'], 'name'>;
 }
 
 export function ContainerInfo(props: ContainerInfoProps) {
-  const { container, status } = props;
-  const theme = useTheme();
-  const classes = useContainerInfoStyles(theme);
-  const { t } = useTranslation('glossary');
+  const { container, status, resource } = props;
+  const { t } = useTranslation(['glossary', 'translation']);
 
-  function getContainerStatusLabel() {
-    if (!status || !container) {
-      return undefined;
+  const [startedDate, finishDate, lastStateStartedDate, lastStateFinishDate] = React.useMemo(() => {
+    function getStartedDate(state?: KubeContainerStatus['state']) {
+      let startedDate = state?.running?.startedAt || state?.terminated?.startedAt || '';
+      if (!!startedDate) {
+        startedDate = localeDate(startedDate);
+      }
+      return startedDate;
     }
 
-    let state: KubeContainerStatus['state']['waiting' | 'terminated'] | null = null;
-    let label = t('frequent|Ready');
-    let statusType: StatusLabelProps['status'] = '';
-
-    if (!!status.state.waiting) {
-      state = status.state.waiting;
-      statusType = 'warning';
-      label = t('frequent|Waiting');
-    } else if (!!status.state.running) {
-      statusType = 'success';
-      label = t('frequent|Running');
-    } else if (!!status.state.terminated) {
-      statusType = status.state.terminated.exitCode === 0 ? '' : 'error';
-      label = t('frequent|Error');
+    function getFinishDate(state?: KubeContainerStatus['state']) {
+      let finishDate = state?.terminated?.finishedAt || '';
+      if (!!finishDate) {
+        finishDate = localeDate(finishDate);
+      }
+      return finishDate;
     }
 
-    const tooltipID = 'container-state-message-' + container.name;
+    return [
+      getStartedDate(status?.state),
+      getFinishDate(status?.state),
+      getStartedDate(status?.lastState),
+      getFinishDate(status?.lastState),
+    ];
+  }, [status]);
+
+  function ContainerStatusLabel(props: {
+    state?: KubeContainerStatus['state'] | null;
+    container?: KubeContainer;
+  }) {
+    const { state, container } = props;
+
+    const [stateDetails, label, statusType] = React.useMemo(() => {
+      let stateDetails: KubeContainerStatus['state']['waiting' | 'terminated'] | null = null;
+      let label = t('translation|Ready');
+      let statusType: StatusLabelProps['status'] = '';
+
+      if (!state) {
+        return [stateDetails, label, statusType];
+      }
+
+      if (!!state.waiting) {
+        stateDetails = state.waiting;
+        statusType = 'warning';
+        label = t('translation|Waiting');
+      } else if (!!state.running) {
+        statusType = 'success';
+        label = t('translation|Running');
+      } else if (!!state.terminated) {
+        stateDetails = state.terminated;
+        if (state.terminated.exitCode === 0) {
+          statusType = '';
+          label = state.terminated.reason;
+        } else {
+          statusType = 'error';
+          label = t('translation|Error');
+        }
+      }
+
+      return [stateDetails, label, statusType];
+    }, [state]);
+
+    if (!state || !container) {
+      return null;
+    }
+
+    const tooltipID = 'container-state-message-' + (container?.name ?? '');
 
     return (
-      <>
-        <StatusLabel status={statusType} aria-describedby={tooltipID}>
-          {label + (state?.reason ? ` (${state.reason})` : '')}
-        </StatusLabel>
-        {!!state && state.message && (
-          <LightTooltip role="tooltip" title={state.message} interactive id={tooltipID}>
-            <Box aria-label="hidden" display="inline" px={1} style={{ verticalAlign: 'bottom' }}>
-              <Icon icon="mdi:alert-outline" width="1.3rem" height="1.3rem" aria-label="hidden" />
-            </Box>
-          </LightTooltip>
-        )}
-      </>
+      <Box>
+        <Box>
+          <StatusLabel
+            status={statusType}
+            aria-describedby={!!stateDetails?.message ? tooltipID : undefined}
+          >
+            {label + (stateDetails?.reason ? ` (${stateDetails.reason})` : '')}
+          </StatusLabel>
+          {!!stateDetails && stateDetails.message && (
+            <LightTooltip role="tooltip" title={stateDetails.message} interactive id={tooltipID}>
+              <Box aria-label="hidden" display="inline" px={1} style={{ verticalAlign: 'bottom' }}>
+                <Icon icon="mdi:alert-outline" width="1.3rem" height="1.3rem" aria-label="hidden" />
+              </Box>
+            </LightTooltip>
+          )}
+        </Box>
+      </Box>
+    );
+  }
+
+  function StatusValue(props: {
+    rows: { name: string; value: string | number; hide?: boolean }[];
+  }) {
+    const { rows } = props;
+    const id = useId('status-value-');
+
+    const rowsToDisplay = React.useMemo(() => {
+      return rows.filter(({ hide }) => !hide);
+    }, [rows]);
+
+    if (rowsToDisplay.length === 0) {
+      return null;
+    }
+
+    return (
+      <Box>
+        {rowsToDisplay.map(({ name, value }, idx) => {
+          const rowId = `${id}-${idx}`;
+          return (
+            <Grid container spacing={2} direction="row" key={rowId}>
+              <Grid item>
+                <Typography id={rowId} color="textSecondary">
+                  {name}
+                </Typography>
+              </Grid>
+              <Grid item>
+                <Typography aria-labelledby={rowId}>{value}</Typography>
+              </Grid>
+            </Grid>
+          );
+        })}
+      </Box>
     );
   }
 
@@ -554,14 +793,65 @@ export function ContainerInfo(props: ContainerInfoProps) {
 
     return [
       {
-        name: t('Status'),
-        value: getContainerStatusLabel(),
+        name: container.name,
+        withHighlightStyle: true,
+      },
+      {
+        name: t('translation|Status'),
+        value: <ContainerStatusLabel state={status?.state} container={container} />,
         hide: !status,
       },
       {
-        name: t('frequent|Restart Count'),
+        name: t('translation|Exit Code'),
+        value: status?.state?.terminated?.exitCode,
+        hide: !status?.state?.terminated,
+      },
+      {
+        name: t('translation|Started'),
+        value: startedDate,
+        hide: !startedDate,
+      },
+      {
+        name: t('translation|Finished'),
+        value: finishDate,
+        hide: !finishDate,
+      },
+      {
+        name: t('translation|Restart Count'),
         value: status?.restartCount,
         hide: !status,
+      },
+      {
+        name: t('translation|Last State'),
+        value: (
+          <Grid container direction="column" spacing={1}>
+            <Grid item>
+              <ContainerStatusLabel state={status?.lastState} container={container} />
+            </Grid>
+            <Grid item>
+              <StatusValue
+                rows={[
+                  {
+                    name: t('translation|Exit Code'),
+                    value: status?.lastState?.terminated?.exitCode,
+                    hide: !status?.lastState?.terminated,
+                  },
+                  {
+                    name: t('translation|Started'),
+                    value: lastStateStartedDate,
+                    hide: !lastStateStartedDate,
+                  },
+                  {
+                    name: t('translation|Finished'),
+                    value: lastStateFinishDate,
+                    hide: !lastStateFinishDate,
+                  },
+                ]}
+              />
+            </Grid>
+          </Grid>
+        ),
+        hide: Object.keys(status?.lastState ?? {}).length === 0,
       },
       {
         name: t('Container ID'),
@@ -569,12 +859,21 @@ export function ContainerInfo(props: ContainerInfoProps) {
         hide: !status,
       },
       {
+        name: t('Image Pull Policy'),
+        value: container.imagePullPolicy,
+      },
+      {
         name: t('Image'),
         value: (
           <>
             <Typography>{container.image}</Typography>
-            {status && (
-              <Typography className={classes.imageID}>
+            {status?.imageID && (
+              <Typography
+                sx={theme => ({
+                  paddingTop: theme.spacing(1),
+                  fontSize: '.95rem',
+                })}
+              >
                 <Typography component="span" style={{ fontWeight: 'bold' }}>
                   ID:
                 </Typography>{' '}
@@ -606,59 +905,90 @@ export function ContainerInfo(props: ContainerInfoProps) {
         value: <LivenessProbes liveness={container.livenessProbe} />,
         hide: _.isEmpty(container.livenessProbe),
       },
+      {
+        name: t('Ports'),
+        value: (
+          <Grid container>
+            {container.ports?.map(({ containerPort, protocol }, index) => (
+              <>
+                <Grid item xs={12} key={`port_line_${index}`}>
+                  <Box display="flex" alignItems={'center'}>
+                    <Box px={0.5} minWidth={120}>
+                      <ValueLabel>{`${protocol}:`}</ValueLabel>
+                      <ValueLabel>{containerPort}</ValueLabel>
+                    </Box>
+                    {!!resource && ['Service', 'Pod'].includes(resource.kind) && (
+                      <PortForward containerPort={containerPort} resource={resource} />
+                    )}
+                  </Box>
+                </Grid>
+                {index < container.ports!.length - 1 && (
+                  <Grid item xs={12}>
+                    <Box mt={2} mb={2}>
+                      <Divider />
+                    </Box>
+                  </Grid>
+                )}
+              </>
+            ))}
+          </Grid>
+        ),
+        hide: _.isEmpty(container.ports),
+      },
+      {
+        name: t('Volume Mounts'),
+        value: <VolumeMounts mounts={container?.volumeMounts || undefined} />,
+        valueCellProps: { sm: 12 as GridSize },
+        hide: _.isEmpty(container?.volumeMounts),
+      },
     ];
   }
 
   return (
-    <Box py={1}>
-      <SectionHeader noPadding title={container.name} headerStyle="normal" />
+    <Box pb={1}>
       <NameValueTable rows={containerRows()} />
-      {!_.isEmpty(container.volumeMounts) && (
-        <>
-          <Divider />
-          <SectionHeader noPadding title={t('Volume Mounts')} headerStyle="label" />
-          <VolumeMounts mounts={container.volumeMounts} />
-        </>
-      )}
     </Box>
   );
 }
 
-interface OwnedPodsSectionProps {
+export interface OwnedPodsSectionProps {
   resource: KubeObjectInterface;
   hideColumns?: PodListProps['hideColumns'];
+  /**
+   * Hides the namespace selector
+   */
+  noSearch?: boolean;
 }
 
 export function OwnedPodsSection(props: OwnedPodsSectionProps) {
-  const { resource, hideColumns } = props;
+  const { resource, hideColumns, noSearch } = props;
+  let namespace;
 
-  const [pods, error] = Pod.useList();
-
-  function getOwnedPods() {
-    if (!pods) {
-      return null;
-    }
-
-    if (resource.kind === 'Node') {
-      return pods.filter(item => item.spec.nodeName === resource.metadata.name);
-    }
-
-    if (resource.kind === 'Namespace') {
-      return pods.filter(item => item.metadata.namespace === resource.metadata.name);
-    }
-
-    const resourceTemplateLabel = Object.values(resource?.spec?.template?.metadata?.labels || []);
-    if (!resourceTemplateLabel) {
-      return [];
-    }
-    return pods.filter(item =>
-      resourceTemplateLabel.every(elem => Object.values(item.metadata.labels).includes(elem))
-    );
+  if (resource.kind === 'Namespace') {
+    namespace = resource.metadata.name;
+  } else {
+    namespace = resource.metadata.namespace;
   }
+  const queryData = {
+    namespace,
+    labelSelector: resource?.spec?.selector ? labelSelectorToQuery(resource?.spec?.selector) : '',
+    fieldSelector: resource.kind === 'Node' ? `spec.nodeName=${resource.metadata.name}` : undefined,
+  };
 
-  const filteredPods = getOwnedPods();
-  return <PodListRenderer hideColumns={hideColumns} pods={filteredPods} error={error} />;
+  const [pods, error] = Pod.useList(queryData);
+  const onlyOneNamespace = !!resource.metadata.namespace || resource.kind === 'Namespace';
+  const hideNamespaceFilter = onlyOneNamespace || noSearch;
+
+  return (
+    <PodListRenderer
+      hideColumns={hideColumns || onlyOneNamespace ? ['namespace'] : undefined}
+      pods={pods}
+      error={error}
+      noNamespaceFilter={hideNamespaceFilter}
+    />
+  );
 }
+
 export function ContainersSection(props: { resource: KubeObjectInterface | null }) {
   const { resource } = props;
   const { t } = useTranslation('glossary');
@@ -685,7 +1015,17 @@ export function ContainersSection(props: { resource: KubeObjectInterface | null 
     return containers;
   }
 
-  function getStatuses() {
+  function getInitContainers() {
+    return resource?.spec?.initContainers || [];
+  }
+
+  function getEphemeralContainers() {
+    return resource?.spec?.ephemeralContainers || [];
+  }
+
+  function getStatuses(
+    statusKind: 'containerStatuses' | 'initContainerStatuses' | 'ephemeralContainerStatuses'
+  ) {
     if (!resource || resource.kind !== 'Pod') {
       return {};
     }
@@ -694,7 +1034,7 @@ export function ContainersSection(props: { resource: KubeObjectInterface | null 
       [key: string]: ContainerInfoProps['status'];
     } = {};
 
-    ((resource as KubePod).status.containerStatuses || []).forEach(containerStatus => {
+    ((resource as KubePod).status[statusKind] || []).forEach(containerStatus => {
       const { name, ...status } = containerStatus;
       statuses[name] = { ...status };
     });
@@ -703,40 +1043,239 @@ export function ContainersSection(props: { resource: KubeObjectInterface | null 
   }
 
   const containers = getContainers();
-  const statuses = getStatuses();
+  const initContainers = getInitContainers();
+  const ephemContainers = getEphemeralContainers();
+  const statuses = getStatuses('containerStatuses');
+  const initStatuses = getStatuses('initContainerStatuses');
+  const ephemStatuses = getStatuses('ephemeralContainerStatuses');
   const numContainers = containers.length;
 
   return (
     <>
-      <SectionBox title={title} />
-      <>
+      <SectionBox title={title}>
         {numContainers === 0 ? (
-          <SectionBox>
-            <Empty>{t('resource|No data to be shown.')}</Empty>
-          </SectionBox>
+          <Empty>{t('translation|No data to be shown.')}</Empty>
         ) : (
-          containers.map((container: any, i: number) => (
-            <SectionBox key={i} outterBoxProps={{ pt: 1 }}>
-              <ContainerInfo container={container} status={statuses[container.name]} />
-            </SectionBox>
+          containers.map((container: any) => (
+            <ContainerInfo
+              key={`container_${container.name}`}
+              resource={resource}
+              container={container}
+              status={statuses[container.name]}
+            />
           ))
         )}
-      </>
+      </SectionBox>
+
+      {ephemContainers.length > 0 && (
+        <SectionBox title={t('glossary|Ephemeral Containers')}>
+          {ephemContainers.map((ephemContainer: KubeContainer) => (
+            <ContainerInfo
+              key={`ephem_container_${ephemContainer.name}`}
+              resource={resource}
+              container={ephemContainer}
+              status={ephemStatuses[ephemContainer.name]}
+            />
+          ))}
+        </SectionBox>
+      )}
+
+      {initContainers.length > 0 && (
+        <SectionBox title={t('translation|Init Containers')}>
+          {initContainers.map((initContainer: KubeContainer, i: number) => (
+            <ContainerInfo
+              key={`init_container_${i}`}
+              resource={resource}
+              container={initContainer}
+              status={initStatuses[initContainer.name]}
+            />
+          ))}
+        </SectionBox>
+      )}
     </>
   );
 }
 
 export function ConditionsSection(props: { resource: KubeObjectInterface | null }) {
   const { resource } = props;
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary']);
 
   if (!resource) {
     return null;
   }
 
   return (
-    <SectionBox title={t('Conditions')}>
+    <SectionBox title={t('translation|Conditions')}>
       <ConditionsTable resource={resource} />
+    </SectionBox>
+  );
+}
+
+export interface VolumeSectionProps {
+  resource: KubeObjectInterface | null;
+}
+
+export interface VolumeRowsProps {
+  volume: KubeVolume;
+}
+
+export interface PrintVolumeLinkProps {
+  volumeName: string;
+  volumeKind: string;
+  volume: KubeVolume;
+}
+
+export interface VolumePrints {
+  directPrint?: any[];
+  yamlPrint?: any[];
+}
+
+export function VolumeSection(props: VolumeSectionProps) {
+  const { t } = useTranslation('glossary');
+  const { resource } = props;
+  const volumes = resource?.spec?.volumes;
+
+  if (!volumes) {
+    return null;
+  }
+
+  const namespace = resource?.metadata?.namespace;
+
+  /*
+   * printVolumeLink will print a working link that is set within the router using fields from the resource as params
+   */
+  function PrintVolumeLink(props: PrintVolumeLinkProps) {
+    const { volumeName, volumeKind, volume } = props;
+    const resourceClasses = ResourceClasses;
+    const classList = Object.keys(resourceClasses) as Array<keyof typeof resourceClasses>;
+
+    for (const kind of classList) {
+      if (kind.toLowerCase() === volumeKind.toLowerCase()) {
+        const volumeClass = resourceClasses[kind];
+        const volumeRoute = volumeClass.detailsRoute;
+        const volumeNamespace = volumeClass.isNamespaced ? namespace : null;
+
+        const volumeKindNames = {
+          configMap: 'name',
+          secret: 'secretName',
+          persistentVolumeClaim: 'claimName',
+        };
+
+        const volumeNameKey = volumeKindNames[volumeKind as keyof typeof volumeKindNames];
+        if (!!volumeNameKey) {
+          const detailName = volume[volumeKind][volumeNameKey];
+          if (!!detailName) {
+            return (
+              <Link
+                routeName={volumeRoute}
+                params={{ namespace: volumeNamespace, name: detailName }}
+              >
+                {volumeName}
+              </Link>
+            );
+          }
+        }
+      }
+    }
+
+    return <Typography>{volumeName}</Typography>;
+  }
+
+  function volumeRows(volume: VolumeRowsProps['volume']) {
+    const { name, ...objWithVolumeKind } = volume;
+    const volumeKind = Object.keys(objWithVolumeKind)[0] || '';
+
+    if (!volume) {
+      return [];
+    }
+
+    function printVolumeDetails(volume: VolumeRowsProps['volume']): VolumePrints {
+      const { ...vol } = volume[volumeKind];
+
+      // array for items that are printable
+      const directPrint = [];
+
+      // array for items that are not printable and need to be printed to yaml
+      const yamlPrint = [];
+
+      // loop over volumeKeys and check if the value is a string, number, or bool
+      for (const key in vol) {
+        if (!(vol[key] === '')) {
+          if (
+            typeof vol[key] === 'string' ||
+            typeof vol[key] === 'number' ||
+            typeof vol[key] === 'boolean'
+          ) {
+            directPrint.push({
+              volKey: key,
+              volValue: typeof vol[key] === 'boolean' ? vol[key].toString() : vol[key],
+            });
+          } else {
+            yamlPrint.push({
+              volKey: key,
+              volValue: vol[key],
+            });
+          }
+        }
+      }
+
+      const volumePrints = {
+        directPrint,
+        yamlPrint,
+      };
+
+      return volumePrints;
+    }
+
+    const volumeDetails: VolumePrints = printVolumeDetails(volume);
+
+    return [
+      {
+        name: name,
+        withHighlightStyle: true,
+      },
+      ...(volumeKind
+        ? [
+            {
+              name: 'Kind',
+              value: volumeKind,
+            },
+          ]
+        : []),
+      {
+        name: 'Source',
+        value: <PrintVolumeLink volumeName={name} volumeKind={volumeKind} volume={volume} />,
+      },
+      ...(volumeDetails.directPrint
+        ? volumeDetails.directPrint.map(
+            ({ volKey, volValue }: { volKey: string; volValue: any }) => {
+              return {
+                name: volKey,
+                value: volValue,
+              };
+            }
+          )
+        : []),
+      ...(volumeDetails.yamlPrint
+        ? volumeDetails.yamlPrint.map(({ volKey, volValue }: { volKey: string; volValue: any }) => {
+            return {
+              name: volKey,
+              value: (
+                <Typography component="pre" variant="body2">
+                  {YAML.stringify(volValue)}
+                </Typography>
+              ),
+            };
+          })
+        : []),
+    ];
+  }
+
+  return (
+    <SectionBox title={t('translation|Volumes')}>
+      {volumes.map((volume: VolumeRowsProps['volume']) => (
+        <NameValueTable key={volume.name} rows={volumeRows(volume)} />
+      ))}
     </SectionBox>
   );
 }

@@ -11,6 +11,8 @@ on:
   push:
     branches:
       - main
+      - rc-*
+      - testing-rc-*
     paths:
     - 'frontend/**'
     - Makefile
@@ -18,21 +20,24 @@ on:
     - 'app/**'
     - 'backend/**'
 
+permissions:
+  contents: read
+
 jobs:
   build-linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        node-version: [16.x]
+        node-version: [20.x]
     steps:
-    - uses: actions/checkout@v2.3.3
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
       with:
         node-version: ${{ matrix.node-version }}
-    - uses: actions/setup-go@v2
+    - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
       with:
-        go-version: 1.17
+        go-version: '1.22.*'
     - name: App linux
       run: |
         make app-linux
@@ -40,18 +45,18 @@ jobs:
     runs-on: windows-2019
     strategy:
       matrix:
-        node-version: [16.x]
+        node-version: [20.x]
     steps:
-    - uses: actions/checkout@v2.3.3
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
       with:
         node-version: ${{ matrix.node-version }}
-    - uses: actions/setup-go@v2
+    - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
       with:
-        go-version: 1.17
+        go-version: '1.22.*'
     - name: Dependencies
-      uses: crazy-max/ghaction-chocolatey@v1
+      uses: crazy-max/ghaction-chocolatey@e80bd39bb49cae70b67ea53d52d00833a7255c21 # v1.7.0
       with:
         args: install make
     - name: App Windows
@@ -60,16 +65,16 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        node-version: [16.x]
+        node-version: [20.x]
     steps:
-    - uses: actions/checkout@v2.3.3
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
       with:
         node-version: ${{ matrix.node-version }}
-    - uses: actions/setup-go@v2
+    - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
       with:
-        go-version: 1.17
+        go-version: '1.22.*'
     - name: Dependencies
       run: brew install make
     - name: App Mac

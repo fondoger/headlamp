@@ -1,58 +1,74 @@
 ---
 title: Contributing to Internationalization
-linkTitle: Contributing
+sidebar_label: Contributing
 ---
 
-This section introduces some concepts for contributing translations, and is
+This section introduces some concepts for contributing translations and is
 especially important when submitting a new language.
 
-**Important:** If you are adding a new language, keep in mind that while all
-the specific Kubernetes components' names are translatable, it doesn't mean
-that all of them should have a corresponding name in your language. Please,
-refer to the [Kubernetes localized docs](https://kubernetes.io/docs/home/) in
-your language (if they exist) in order to understand which components should
-be translated and which should be left in the original form.
+**Important:** If you add a new language, keep in mind that while all
+the specific Kubernetes components' names are translatable, not all of them
+will have a corresponding name in your language. Please refer to the
+[Kubernetes localized docs](https://kubernetes.io/docs/home/) in your
+language (if they exist) to understand which components should
+be translated and which should be left in their original form.
 
 ## Namespaces
 
-[i18next namespaces](https://www.i18next.com/principles/namespaces)
-are useful to keep things modular.
+We have only two main [i18next namespaces](https://www.i18next.com/principles/namespaces):
 
-We have a namespace for each app section, and also some frequently used global parts.
-Namespaces are separated from the actual text by a `|` character.
-E.g. `t('mynamescapce|This will be the translated text')`.
+- **glossary**: For Kubernetes jargon or terms/sentences that are very technical.
+- **translation**: Default namespace, used for everything else not in the **glossary** namespace.
 
-### Frequent, and Glossary namespaces
+We do have a third namespace that concerns only the desktop app related strings: **app**.
 
-Additionally we have some global namespaces for frequently used and
-jargony technical words.
+In Headlamp, namespaces are separated by a `|` character. E.g. `t('glossary|Pod')`.
 
-- frequent.json, Phrases reused many times, eg. 'save', 'cancel'
-- glossary.json, Reusing these consistently inside texts like jargon words (Pods)
+## Context
+
+In order to better express context for a translation, we use the [i18next context](https://www.i18next.com/principles/context) feature. It is used like this:
+
+```typescript
+return t("translation|Desired", { context: "pods" });
+```
+
+In the example above, we give the extra context of "pods" for the word "Desired". It refers to the concept of pod, and precisely more than one (in case the target language of
+the translation distinguishes between plural and singular for this word).
+
+In the translated files, the context will show up in the respective key as:
+
+```json
+    "Desired//context:pods": ""
+```
+
+And should be translated without that context suffix. For example, for Spanish:
+
+```json
+    "Desired//context:pods": "Deseados"
+```
 
 #### Technical Jargon words
 
-For some technical/jargon terms there often isn't a good translation for
+For some technical/jargon terms, there often isn't a good translation for
 them. To find these ones, it can be good to look at existing documentation
 like the k8s docs.
 
 The word "Pods" is a good example of a technical word that is used in Spanish.
 Maybe it could directly translate to "Vainas", but "Pods" is used instead.
 
-- https://kubernetes.io/es/docs/concepts/workloads/pods/pod/
-- https://kubernetes.io/docs/concepts/workloads/pods/pod/
+- <https://kubernetes.io/es/docs/concepts/workloads/pods/pod/>
+- <https://kubernetes.io/docs/concepts/workloads/pods/pod/>
 
 ## Number formatting
 
-Numbers are formatted in a locale specific way. For example in 'en'
+Numbers are formatted in a locale-specific way. For example in 'en'
 they are formatted like `1,000,000` but with 'de' they are formatted
 like `1.000.000`.
 
 Here is an example which can use number formatting:
 
-
 ```JavaScript
-    return t('cluster:{{numReady, number}} / {{numItems, number}} Requested', {
+    return t('{{numReady, number}} / {{numItems, number}} Requested', {
       numReady: podsReady.length,
       numItems: items.length,
     });
@@ -66,20 +82,11 @@ Here's an example of using date formatting:
 
 ```Javascript
     return t('appsection:When {{ date, date }}', {
-      date: new Date(),
+
     });
 ```
 
-## Adding a new component.
-
-See the `frontend/src/i18n/locales/en/` folder for a complete list of namespaces.
-If you need a new namespace (e.g. when you're using a sentence that's very specific to
-a single/new component), use that namespace as you would if it already existed.
-
-Then run `make i18n` and a new translation file for that namespace will show up in
-all locale folders.
-
-## Adding a new language.
+## Adding a new language
 
 Create a folder using the locale code in:
 `frontend/src/i18n/locales/` and `app/electron/locales`
@@ -89,9 +96,33 @@ the project and creates the corresponding catalog files.
 
 Integrated components may need to be adjusted (MaterialUI/Monaco etc).
 
+## Translating missing strings
+
+Technical development happens more frequently than translations. Thus, chances
+are that developers introduce new strings that need to be translated and will
+be stored as empty strings (defaulting to English) in the translation files.
+
+In order to more easily spot and translate the missing strings, we have two CLI
+tools:
+
+- _extract-empty-translations.js_: This script (in ./frontend/src/i18n/tools/)
+  will extract the strings without a corresponding translation from the translation
+  files, and copy them into a new file.
+  E.g. `$ node copy-empty-translations.js ../locales/de/translation.json` will
+  by default create a `../locales/de/translation_empty.json`. This file can be
+  used to translate the strings in a more isolated way.
+- _copy-translations.js_: This script (in ./frontend/src/i18n/tools/)
+  by default copies any existing translations from one source translation file to
+  a target one, if the same key is not translated in the destination file.
+  E.g. `$ node copy-translations.js ../locales/de/translation_no_longer_empty.json ../locales/de/translation.json` will
+  copy any new translations from the file given as the first argument to the one
+  given as the second argument, if the same key is not translated in the second.
+  There are some options to this script, which can be seen by running it with the
+  `--help` flag.
+
 ## Material UI
 
-Some Material UI components are localized, and are configured
+Some Material UI components are localized and are configured
 via a theme provider.
 
 See the Material UI
@@ -100,7 +131,7 @@ and also `frontend/src/i18n/ThemeProviderNexti18n.tsx` where integration is done
 
 ## Storybook integration
 
-TODO: not implmented. There's no working addons that let you set a language easily.
+TODO: not implemented. There's no working addons that let you set a language easily.
 
 ## Monaco editor integration
 

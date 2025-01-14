@@ -1,45 +1,65 @@
 import { Icon } from '@iconify/react';
-import Box from '@material-ui/core/Box';
-import Checkbox from '@material-ui/core/Checkbox';
-import { useTheme } from '@material-ui/core/styles';
-import TextField from '@material-ui/core/TextField';
-import Typography from '@material-ui/core/Typography';
-import Autocomplete from '@material-ui/lab/Autocomplete';
-import React from 'react';
+import Autocomplete from '@mui/material/Autocomplete';
+import Box from '@mui/material/Box';
+import Checkbox from '@mui/material/Checkbox';
+import { useTheme } from '@mui/material/styles';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import { useHistory, useLocation } from 'react-router-dom';
-import { addQuery } from '../../helpers';
+import helpers, { addQuery } from '../../helpers';
+import { useCluster } from '../../lib/k8s';
 import Namespace from '../../lib/k8s/namespace';
-import { setNamespaceFilter } from '../../redux/actions/actions';
+import { setNamespaceFilter } from '../../redux/filterSlice';
 import { useTypedSelector } from '../../redux/reducers/reducers';
 
 export interface PureNamespacesAutocompleteProps {
   namespaceNames: string[];
   onChange: (event: React.ChangeEvent<{}>, newValue: string[]) => void;
-  filter: { namespaces: Set<string>; search: string };
+  filter: { namespaces: Set<string> };
 }
 
 export function PureNamespacesAutocomplete({
   namespaceNames,
-  onChange,
+  onChange: onChangeFromProps,
   filter,
 }: PureNamespacesAutocompleteProps) {
   const theme = useTheme();
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
+  const [namespaceInput, setNamespaceInput] = React.useState<string>('');
+  const maxNamespacesChars = 12;
+
+  const onInputChange = (event: object, value: string, reason: string) => {
+    // For some reason, the AutoComplete component resets the text after a short
+    // delay, so we need to avoid that or the user won't be able to edit/use what they type.
+    if (reason !== 'reset') {
+      setNamespaceInput(value);
+    }
+  };
+
+  const onChange = (event: React.ChangeEvent<{}>, newValue: string[]) => {
+    // Now we reset the input so it won't show next to the selected namespaces.
+    setNamespaceInput('');
+    onChangeFromProps(event, newValue);
+  };
 
   return (
     <Autocomplete
       multiple
       id="namespaces-filter"
       autoComplete
+      openOnFocus
       options={namespaceNames}
       onChange={onChange}
+      onInputChange={onInputChange}
+      inputValue={namespaceInput}
       // We reverse the namespaces so the last chosen appear as the first in the label. This
       // is useful since the label is ellipsized and this we get to see it change.
       value={[...filter.namespaces.values()].reverse()}
-      renderOption={(option, { selected }) => (
-        <React.Fragment>
+      renderOption={(props, option, { selected }) => (
+        <li {...props}>
           <Checkbox
             icon={<Icon icon="mdi:checkbox-blank-outline" />}
             checkedIcon={<Icon icon="mdi:check-box-outline" />}
@@ -49,13 +69,36 @@ export function PureNamespacesAutocomplete({
             checked={selected}
           />
           {option}
-        </React.Fragment>
+        </li>
       )}
       renderTags={(tags: string[]) => {
-        const joinedTags = tags.join(', ');
+        if (tags.length === 0) {
+          return <Typography variant="body2">{t('translation|All namespaces')}</Typography>;
+        }
+
+        let namespacesToShow = tags[0];
+        const joiner = ', ';
+        const joinerLength = joiner.length;
+        let joinnedNamespaces = 1;
+
+        tags.slice(1).forEach(tag => {
+          if (namespacesToShow.length + tag.length + joinerLength <= maxNamespacesChars) {
+            namespacesToShow += joiner + tag;
+            joinnedNamespaces++;
+          }
+        });
+
         return (
-          <Typography>
-            {joinedTags.length > 15 ? joinedTags : joinedTags.slice(0, 15) + '…'}
+          <Typography style={{ overflowWrap: 'anywhere' }} ml={1}>
+            {namespacesToShow.length > maxNamespacesChars
+              ? namespacesToShow.slice(0, maxNamespacesChars) + '…'
+              : namespacesToShow}
+            {tags.length > joinnedNamespaces && (
+              <>
+                <span>,&nbsp;</span>
+                <b>{`+${tags.length - joinnedNamespaces}`}</b>
+              </>
+            )}
           </Typography>
         );
       }}
@@ -63,7 +106,8 @@ export function PureNamespacesAutocomplete({
         <Box width="15rem">
           <TextField
             {...params}
-            variant="standard"
+            variant="outlined"
+            size="small"
             label={t('Namespaces')}
             fullWidth
             InputLabelProps={{ shrink: true }}
@@ -81,22 +125,45 @@ export function NamespacesAutocomplete() {
   const location = useLocation();
   const dispatch = useDispatch();
   const filter = useTypedSelector(state => state.filter);
+  const cluster = useCluster();
   const [namespaceNames, setNamespaceNames] = React.useState<string[]>([]);
 
-  Namespace.useApiList((namespaces: Namespace[]) => {
-    setNamespaceNames(namespaces.map(namespace => namespace.metadata.name));
-  });
+  React.useEffect(() => {
+    const settings = helpers.loadClusterSettings(cluster || '');
+    const allowedNamespaces = settings?.allowedNamespaces || [];
+    if (allowedNamespaces.length > 0) {
+      setNamespaceNames(allowedNamespaces);
+    }
+  }, [cluster]);
 
   const onChange = (event: React.ChangeEvent<{}>, newValue: string[]) => {
     addQuery({ namespace: newValue.join(' ') }, { namespace: '' }, history, location, '');
     dispatch(setNamespaceFilter(newValue));
   };
 
-  return (
+  return namespaceNames.length > 0 ? (
     <PureNamespacesAutocomplete
       namespaceNames={namespaceNames}
       onChange={onChange}
       filter={filter}
     />
+  ) : (
+    <NamespacesFromClusterAutocomplete onChange={onChange} filter={filter} />
   );
+}
+
+function NamespacesFromClusterAutocomplete(
+  props: Omit<PureNamespacesAutocompleteProps, 'namespaceNames'>
+) {
+  const [namespacesList] = Namespace.useList();
+  const namespaceNames = useMemo(
+    () =>
+      namespacesList
+        ?.map(namespace => namespace.metadata.name)
+        .slice()
+        .sort((a, b) => a.localeCompare(b)) ?? [],
+    [namespacesList]
+  );
+
+  return <PureNamespacesAutocomplete namespaceNames={namespaceNames} {...props} />;
 }

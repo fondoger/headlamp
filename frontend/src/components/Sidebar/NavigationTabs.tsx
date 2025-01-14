@@ -1,23 +1,17 @@
-import { Divider } from '@material-ui/core';
-import Box from '@material-ui/core/Box';
-import { makeStyles } from '@material-ui/core/styles';
-import useMediaQuery from '@material-ui/core/useMediaQuery';
+import { Divider } from '@mui/material';
+import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTranslation } from 'react-i18next';
 import { generatePath, useHistory } from 'react-router';
 import { createRouteURL } from '../../lib/router';
 import { getCluster, getClusterPrefixedPath } from '../../lib/util';
 import { useTypedSelector } from '../../redux/reducers/reducers';
-import { SidebarEntry } from '../../redux/reducers/ui';
 import Tabs from '../common/Tabs';
+import { SidebarItemProps } from '../Sidebar';
 import prepareRoutes from './prepareRoutes';
 
-const useStyle = makeStyles(() => ({
-  tabs: {
-    maxWidth: '85vw',
-  },
-}));
-
-function searchNameInSubList(sublist: SidebarEntry['subList'], name: string): boolean {
+function searchNameInSubList(sublist: SidebarItemProps['subList'], name: string): boolean {
   if (!sublist) {
     return false;
   }
@@ -29,7 +23,10 @@ function searchNameInSubList(sublist: SidebarEntry['subList'], name: string): bo
   return false;
 }
 
-function findParentOfSubList(list: SidebarEntry[], name: string | null): SidebarEntry | null {
+function findParentOfSubList(
+  list: SidebarItemProps[],
+  name: string | null
+): SidebarItemProps | null {
   if (!name) {
     return null;
   }
@@ -45,20 +42,22 @@ function findParentOfSubList(list: SidebarEntry[], name: string | null): Sidebar
 
 export default function NavigationTabs() {
   const history = useHistory();
-  const classes = useStyle();
-  const sidebar = useTypedSelector(state => state.ui.sidebar);
-  const isMobile = useMediaQuery('(max-width:600px)');
+  const sidebar = useTypedSelector(state => state.sidebar);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('xs'));
+  const isSmallSideBar = useMediaQuery(theme.breakpoints.only('sm'));
   const { t } = useTranslation();
 
-  if (sidebar.isSidebarOpen || isMobile) {
+  // Always show the navigation tabs when the sidebar is the small version
+  if (!isSmallSideBar && (sidebar.isSidebarOpen || isMobile)) {
     return null;
   }
 
   let defaultIndex = null;
-  const listItems = prepareRoutes(t);
-  let navigationItem = listItems.find(item => item.name === sidebar.selected);
+  const listItems = prepareRoutes(t, sidebar.selected.sidebar || '');
+  let navigationItem = listItems.find(item => item.name === sidebar.selected.item);
   if (!navigationItem) {
-    const parent = findParentOfSubList(listItems, sidebar.selected);
+    const parent = findParentOfSubList(listItems, sidebar.selected.item);
     if (!parent) {
       return null;
     }
@@ -70,39 +69,56 @@ export default function NavigationTabs() {
     return null;
   }
 
+  /**
+   * This function is used to handle the tab change event.
+   *
+   * @param index The index of the tab that was clicked.
+   * @returns void
+   */
   function tabChangeHandler(index: number) {
     if (!subList) {
       return;
     }
-    let pathname;
 
     const url = subList[index].url;
-    if (url) {
-      pathname = generatePath(getClusterPrefixedPath(url), { cluster: getCluster()! });
+    const useClusterURL = !!subList[index].useClusterURL;
+    if (url && useClusterURL && getCluster()) {
+      history.push({
+        pathname: generatePath(getClusterPrefixedPath(url), { cluster: getCluster()! }),
+      });
+    } else if (url) {
+      history.push(url);
     } else {
-      pathname = createRouteURL(subList[index].name);
+      history.push({ pathname: createRouteURL(subList[index].name) });
     }
-    history.push({ pathname });
   }
 
   if (createRouteURL(navigationItem.name)) {
     subList.unshift(navigationItem);
   }
 
-  const tabRoutes = subList.map((item: any) => {
-    return { label: item.label, component: <></> };
-  });
+  const tabRoutes = subList
+    .filter(item => !item.hide)
+    .map((item: SidebarItemProps) => {
+      return { label: item.label, component: <></> };
+    });
 
-  defaultIndex = subList.findIndex(item => item.name === sidebar.selected);
+  defaultIndex = subList.findIndex(item => item.name === sidebar.selected.item);
   return (
-    <Box mb={2} component="nav">
+    <Box mb={2} component="nav" aria-label={t('translation|Main Navigation')}>
       <Tabs
         tabs={tabRoutes}
         onTabChanged={index => {
           tabChangeHandler(index);
         }}
         defaultIndex={defaultIndex}
-        className={classes.tabs}
+        sx={{
+          maxWidth: '85vw',
+          [theme.breakpoints.down('sm')]: {
+            paddingTop: theme.spacing(1),
+          },
+        }}
+        ariaLabel={t('translation|Navigation Tabs')}
       />
       <Divider />
     </Box>

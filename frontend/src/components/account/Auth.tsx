@@ -1,11 +1,11 @@
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
-import DialogActions from '@material-ui/core/DialogActions';
-import DialogContent from '@material-ui/core/DialogContent';
-import DialogContentText from '@material-ui/core/DialogContentText';
-import Link from '@material-ui/core/Link';
-import Snackbar from '@material-ui/core/Snackbar';
-import TextField from '@material-ui/core/TextField';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import Link from '@mui/material/Link';
+import Snackbar, { SnackbarCloseReason } from '@mui/material/Snackbar';
+import TextField from '@mui/material/TextField';
 import React from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { generatePath, useHistory } from 'react-router-dom';
@@ -15,6 +15,7 @@ import { ApiError, testAuth } from '../../lib/k8s/apiProxy';
 import { getCluster, getClusterPrefixedPath } from '../../lib/util';
 import { ClusterDialog } from '../cluster/Chooser';
 import { DialogTitle } from '../common/Dialog';
+import HeadlampLink from '../common/Link';
 
 export default function AuthToken() {
   const history = useHistory();
@@ -22,7 +23,7 @@ export default function AuthToken() {
   const [token, setToken] = React.useState('');
   const [showError, setShowError] = React.useState(false);
   const clusters = useClustersConf();
-  const { t } = useTranslation(['auth']);
+  const { t } = useTranslation();
 
   function onAuthClicked() {
     loginWithToken(token).then(code => {
@@ -75,7 +76,10 @@ export interface PureAuthTokenProps {
   onCancel: clickCallbackType;
   onChangeToken: changeCallbackType;
   onAuthClicked: clickCallbackType;
-  onCloseError: (event: React.SyntheticEvent<any, Event>, reason: string) => void;
+  onCloseError: (
+    event: Event | React.SyntheticEvent<any, Event>,
+    reason: SnackbarCloseReason
+  ) => void;
 }
 
 export function PureAuthToken({
@@ -88,8 +92,9 @@ export function PureAuthToken({
   onChangeToken,
   onCloseError,
 }: PureAuthTokenProps) {
-  const { t } = useTranslation('auth');
-  const focusedRef = React.useCallback(node => {
+  const { t } = useTranslation();
+  const cluster = getCluster();
+  const focusedRef = React.useCallback((node: HTMLDivElement) => {
     if (node !== null) {
       // node.setAttribute('tabindex', '-1');
       node.focus();
@@ -126,7 +131,7 @@ export function PureAuthToken({
               <Link
                 style={{ cursor: 'pointer', marginLeft: '0.4rem' }}
                 target="_blank"
-                href="https://kinvolk.io/docs/headlamp/latest/installation/#authentication--log-in"
+                href="https://headlamp.dev/docs/latest/installation/#create-a-service-account-token"
               >
                 service account token
               </Link>
@@ -135,17 +140,22 @@ export function PureAuthToken({
           </Box>
           <div style={{ flex: '1 0 0' }}></div>
         </DialogActions>
+        <Box overflow="hidden" textAlign="center">
+          <HeadlampLink routeName="settingsCluster" params={{ clusterID: cluster || '' }}>
+            {t('translation|Cluster settings')}
+          </HeadlampLink>
+        </Box>
         <DialogActions>
           {showActions && (
             <>
               <Button onClick={onCancel} color="primary">
-                {t('frequent|Cancel')}
+                {t('translation|Cancel')}
               </Button>
               <div style={{ flex: '1 0 0' }} />
             </>
           )}
           <Button onClick={onAuthClicked} color="primary">
-            {t('auth|Authenticate')}
+            {t('translation|Authenticate')}
           </Button>
         </DialogActions>
       </ClusterDialog>
@@ -160,7 +170,7 @@ export function PureAuthToken({
         ContentProps={{
           'aria-describedby': 'message-id',
         }}
-        message={<span id="message-id">{t('auth|Error authenticating')}</span>}
+        message={<span id="message-id">{t('translation|Error authenticating')}</span>}
       />
     </Box>
   );

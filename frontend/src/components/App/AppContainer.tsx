@@ -1,9 +1,12 @@
+import { GlobalStyles } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
 import React from 'react';
 import { BrowserRouter, HashRouter } from 'react-router-dom';
 import helpers from '../../helpers';
+import Plugins from '../../plugin/Plugins';
 import ReleaseNotes from '../common/ReleaseNotes/ReleaseNotes';
 import Layout from './Layout';
+import { PreviousRouteProvider } from './RouteSwitcher';
 
 export default function AppContainer() {
   const Router = ({ children }: React.PropsWithChildren<{}>) =>
@@ -20,8 +23,25 @@ export default function AppContainer() {
         horizontal: 'left',
       }}
     >
+      <GlobalStyles
+        styles={{
+          ':root': {
+            '@media (prefers-reduced-motion: reduce)': {
+              '& *': {
+                animationDuration: '0.01ms !important',
+                animationIterationCount: '1 !important',
+                transitionDuration: '0.01ms !important',
+                scrollBehavior: 'auto !important',
+              },
+            },
+          },
+        }}
+      />
       <Router>
-        <Layout />
+        <PreviousRouteProvider>
+          <Plugins />
+          <Layout />
+        </PreviousRouteProvider>
       </Router>
       <ReleaseNotes />
     </SnackbarProvider>

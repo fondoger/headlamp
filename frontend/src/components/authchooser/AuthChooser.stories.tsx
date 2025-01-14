@@ -1,5 +1,5 @@
-import { Meta, Story } from '@storybook/react/types-6-0';
-import React from 'react';
+import { Meta, StoryFn } from '@storybook/react';
+import { TestContext } from '../../test';
 import { PureAuthChooser, PureAuthChooserProps } from './index';
 
 export default {
@@ -11,18 +11,27 @@ export default {
     handleTryAgain: { action: 'try again clicked' },
     handleBackButtonPress: { action: 'back button clicked' },
   },
+  decorators: [
+    Story => {
+      return (
+        <TestContext>
+          <Story />
+        </TestContext>
+      );
+    },
+  ],
 } as Meta;
 
-const Template: Story<PureAuthChooserProps> = args => <PureAuthChooser {...args} />;
+const Template: StoryFn<PureAuthChooserProps> = args => <PureAuthChooser {...args} />;
 
 const argFixture = {
+  clusterName: 'some-cluster',
   title: 'some title',
   testingTitle: 'some testing title',
   testingAuth: false,
   error: null,
   oauthUrl: 'http://example.com/',
   clusterAuthType: '',
-  haveClusters: false,
 };
 
 export const BasicAuthChooser = Template.bind({});
@@ -39,7 +48,6 @@ Testing.args = {
 export const HaveClusters = Template.bind({});
 HaveClusters.args = {
   ...argFixture,
-  haveClusters: true,
 };
 
 export const AuthTypeoidc = Template.bind({});

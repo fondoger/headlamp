@@ -1,12 +1,12 @@
-import { Meta, Story } from '@storybook/react/types-6-0';
+import { configureStore } from '@reduxjs/toolkit';
+import { Meta, StoryFn } from '@storybook/react';
 import { SnackbarProvider } from 'notistack';
-import React from 'react';
-import { useTranslation } from 'react-i18next';
-import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router-dom';
-import store from '../../redux/stores/store';
-import prepareRoutes from './prepareRoutes';
-import { PureSidebar, PureSidebarProps } from './Sidebar';
+import { initialState as CONFIG_INITIAL_STATE } from '../../redux/configSlice';
+import { initialState as FILTER_INITIAL_STATE } from '../../redux/filterSlice';
+import { INITIAL_STATE as UI_INITIAL_STATE } from '../../redux/reducers/ui';
+import { TestContext } from '../../test';
+import Sidebar, { DefaultSidebars, PureSidebar } from './Sidebar';
+import { initialState as SIDEBAR_INITIAL_STATE, SidebarState } from './sidebarSlice';
 
 export default {
   title: 'Sidebar/Sidebar',
@@ -14,36 +14,99 @@ export default {
   argTypes: {
     dispatch: { action: 'dispatch' },
   },
-  decorators: [
-    Story => (
-      <MemoryRouter>
-        <SnackbarProvider>
-          <Story />
-        </SnackbarProvider>
-      </MemoryRouter>
-    ),
-  ],
 } as Meta;
 
-const Template: Story<PureSidebarProps> = args => {
-  const [open, setOpenConfirm] = React.useState(args.open);
-  const { t } = useTranslation();
-  const items = prepareRoutes(t);
+type StoryProps = Partial<SidebarState>;
+
+const Template: StoryFn<StoryProps> = args => {
+  const sidebarStore = configureStore({
+    reducer: (
+      state = {
+        ui: { ...UI_INITIAL_STATE },
+      }
+    ) => state,
+    preloadedState: {
+      plugins: {
+        loaded: true,
+      },
+      config: {
+        ...CONFIG_INITIAL_STATE,
+      },
+      filter: {
+        ...FILTER_INITIAL_STATE,
+      },
+      ui: {
+        ...UI_INITIAL_STATE,
+      },
+      sidebar: {
+        ...SIDEBAR_INITIAL_STATE,
+        isVisible: true,
+        ...args,
+      },
+    },
+  });
 
   return (
-    <Provider store={store}>
-      <PureSidebar {...args} items={items} open={open} onToggleOpen={() => setOpenConfirm(!open)} />
-    </Provider>
+    <TestContext store={sidebarStore}>
+      <SnackbarProvider>
+        <Sidebar />
+      </SnackbarProvider>
+    </TestContext>
   );
 };
 
-export const Open = Template.bind({});
-Open.args = {
-  open: true,
-  selectedName: 'cluster',
+export const InClusterSidebarOpen = Template.bind({});
+InClusterSidebarOpen.args = {
+  isSidebarOpen: true,
+  selected: {
+    item: 'cluster',
+    sidebar: DefaultSidebars.IN_CLUSTER,
+  },
 };
-export const Closed = Template.bind({});
-Closed.args = {
-  open: false,
-  selectedName: 'cluster',
+export const InClusterSidebarClosed = Template.bind({});
+InClusterSidebarClosed.args = {
+  isSidebarOpen: false,
+  selected: {
+    item: 'cluster',
+    sidebar: DefaultSidebars.IN_CLUSTER,
+  },
+};
+export const NoSidebar = Template.bind({});
+NoSidebar.args = {
+  selected: {
+    item: null,
+    sidebar: null,
+  },
+};
+export const SelectedItemWithSidebarOmitted = Template.bind({});
+SelectedItemWithSidebarOmitted.args = {
+  selected: {
+    item: 'workloads',
+    // This is what happens internally when plugins only set a selected name, not a selected sidebar.
+    // i.e. it will use the in-cluster sidebar by default.
+    sidebar: '',
+  },
+};
+export const HomeSidebarOpen = Template.bind({});
+HomeSidebarOpen.args = {
+  selected: {
+    item: 'settings',
+    sidebar: DefaultSidebars.HOME,
+  },
+};
+export const HomeSidebarClosed = Template.bind({});
+HomeSidebarClosed.args = {
+  isSidebarOpen: false,
+  selected: {
+    item: 'settings',
+    sidebar: DefaultSidebars.HOME,
+  },
+};
+export const NotVisibleSidebar = Template.bind({});
+NotVisibleSidebar.args = {
+  isVisible: false,
+  selected: {
+    item: 'settings',
+    sidebar: DefaultSidebars.HOME,
+  },
 };

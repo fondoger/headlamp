@@ -2,109 +2,169 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import ClusterRoleBinding from '../../lib/k8s/clusterRoleBinding';
 import RoleBinding from '../../lib/k8s/roleBinding';
-import { useErrorState, useFilterFunc } from '../../lib/util';
-import Link from '../common/Link';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import { combineClusterListErrors, getClusterGroup } from '../../lib/util';
+import { useNamespaces } from '../../redux/filterSlice';
+import { Link } from '../common';
+import LabelListItem from '../common/LabelListItem';
+import ResourceListView from '../common/Resource/ResourceListView';
 
-interface RoleBindingDict {
-  [kind: string]: RoleBinding[] | null;
+function RoleLink(props: { role: string; namespace?: string }) {
+  const { role, namespace } = props;
+
+  if (namespace) {
+    return (
+      <Link routeName="role" params={{ name: role, namespace }} tooltip>
+        {role}
+      </Link>
+    );
+  }
+
+  return (
+    <Link routeName="clusterrole" params={{ name: role }} tooltip>
+      {role}
+    </Link>
+  );
 }
 
 export default function RoleBindingList() {
-  const [bindings, setBindings] = React.useState<RoleBindingDict | null>(null);
-  const [roleBindingError, onRoleBindingError] = useErrorState(setupRoleBindings);
-  const [clusterRoleBindingError, onClusterRoleBindingError] =
-    useErrorState(setupClusterRoleBindings);
-  const { t } = useTranslation('glossary');
-  const filterFunc = useFilterFunc(['.kind']);
+  const { t } = useTranslation(['glossary', 'translation']);
+  const { items: roles, clusterErrors: rolesErrors } = RoleBinding.useList({
+    namespace: useNamespaces(),
+  });
+  const { items: clusterRoles, clusterErrors: clusterRolesErrors } = ClusterRoleBinding.useList();
+  const clusters = getClusterGroup();
 
-  function setRoleBindings(newBindings: RoleBinding[] | null, kind: string) {
-    const currentBindings: RoleBindingDict = bindings || {};
-    const data = { ...currentBindings };
+  const isMultiCluster = clusters.length > 1;
 
-    data[kind] = newBindings;
-
-    setBindings(data);
-  }
-
-  function setupRoleBindings(newBindings: RoleBinding[] | null) {
-    setRoleBindings(newBindings, 'RoleBinding');
-  }
-
-  function setupClusterRoleBindings(newBindings: RoleBinding[] | null) {
-    setRoleBindings(newBindings, 'ClusterRoleBinding');
-  }
-
-  function getJointItems() {
-    if (!bindings) {
+  const allRoles = React.useMemo(() => {
+    if (roles === null && clusterRoles === null) {
       return null;
     }
 
-    let joint: RoleBinding[] = [];
-    let hasItems = false;
-    for (const items of Object.values(bindings as object)) {
-      if (items !== null) {
-        joint = joint.concat(items);
-        hasItems = true;
-      }
-    }
+    return roles ? roles.concat(clusterRoles || []) : clusterRoles;
+  }, [roles, clusterRoles]);
 
-    return hasItems ? joint : null;
-  }
+  const allErrors = React.useMemo(() => {
+    return combineClusterListErrors(rolesErrors || null, clusterRolesErrors || null);
+  }, [rolesErrors, clusterRolesErrors]);
 
   function getErrorMessage() {
-    if (getJointItems() === null) {
-      return RoleBinding.getErrorMessage(roleBindingError || clusterRoleBindingError);
+    if (Object.values(allErrors || {}).length === clusters.length && clusters.length > 1) {
+      return RoleBinding.getErrorMessage(Object.values(allErrors!)[0]);
     }
 
     return null;
   }
 
-  RoleBinding.useApiList(setupRoleBindings, onRoleBindingError);
-  ClusterRoleBinding.useApiList(setupClusterRoleBindings, onClusterRoleBindingError);
+  function sortBindings(kind: string) {
+    return function (r1: RoleBinding, r2: RoleBinding) {
+      const groups1 = r1?.subjects
+        ?.filter(subject => subject.kind === kind)
+        .map(subject => subject.name);
+      const groups2 = r2?.subjects
+        ?.filter(subject => subject.kind === kind)
+        .map(subject => subject.name);
+      if (groups1 && groups2) {
+        return groups1.join('').localeCompare(groups2.join(''));
+      } else if (groups1) {
+        return 1;
+      } else if (groups2) {
+        return -1;
+      } else {
+        return 0;
+      }
+    };
+  }
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Role Bindings')} />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={getErrorMessage()}
-        columns={[
-          {
-            label: t('Type'),
-            getter: item => item.kind,
-            sort: true,
-          },
-          {
-            label: t('frequent|Name'),
-            getter: item => <Link kubeObject={item} />,
-            sort: (r1: RoleBinding, r2: RoleBinding) => {
-              if (r1.metadata.name < r2.metadata.name) {
-                return -1;
-              } else if (r1.metadata.name > r2.metadata.name) {
-                return 1;
+    <ResourceListView
+      title={t('glossary|Role Bindings')}
+      errorMessage={getErrorMessage()}
+      clusterErrors={isMultiCluster ? allErrors : null}
+      columns={[
+        'type',
+        'name',
+        {
+          id: 'namespace',
+          label: t('glossary|Namespace'),
+          getValue: item => item.getNamespace() ?? t('translation|All namespaces'),
+          render: item =>
+            item.getNamespace() ? (
+              <Link routeName="namespace" params={{ name: item.getNamespace() }}>
+                {item.getNamespace()}
+              </Link>
+            ) : (
+              t('translation|All namespaces')
+            ),
+        },
+        'cluster',
+        {
+          id: 'role',
+          label: t('glossary|Role'),
+          getValue: item => item.roleRef.name,
+          render: item => <RoleLink role={item.roleRef.name} namespace={item.getNamespace()} />,
+        },
+        {
+          id: 'users',
+          label: t('translation|Users'),
+          getValue: item =>
+            item?.subjects
+              ?.filter(s => s.kind === 'User')
+              ?.map(s => s.name)
+              ?.join(' '),
+          render: item => (
+            <LabelListItem
+              labels={
+                item?.subjects
+                  ?.filter(subject => subject.kind === 'User')
+                  .map(subject => subject.name) || []
               }
-              return 0;
-            },
-          },
-          {
-            label: t('glossary|Namespace'),
-            getter: item => item.getNamespace() || 'All namespaces',
-            sort: true,
-          },
-          {
-            label: t('frequent|Age'),
-            getter: item => item.getAge(),
-            sort: (r1: RoleBinding, r2: RoleBinding) =>
-              new Date(r2.metadata.creationTimestamp).getTime() -
-              new Date(r1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={getJointItems()}
-        defaultSortingColumn={4}
-      />
-    </SectionBox>
+            />
+          ),
+          sort: sortBindings('User'),
+        },
+        {
+          id: 'groups',
+          label: t('glossary|Groups'),
+          getValue: item =>
+            item?.subjects
+              ?.filter(subject => subject.kind === 'Group')
+              ?.map(subject => subject.name)
+              ?.join(' '),
+          render: item => (
+            <LabelListItem
+              labels={
+                item?.subjects
+                  ?.filter(subject => subject.kind === 'Group')
+                  .map(subject => subject.name) || []
+              }
+            />
+          ),
+          sort: sortBindings('Group'),
+        },
+        {
+          id: 'serviceaccounts',
+          label: t('glossary|Service Accounts'),
+          getValue: item =>
+            item?.subjects
+              ?.filter(subject => subject.kind === 'ServiceAccount')
+              ?.map(subject => subject.name)
+              ?.join(' '),
+          render: item => (
+            <LabelListItem
+              labels={
+                item?.subjects
+                  ?.filter(subject => subject.kind === 'ServiceAccount')
+                  .map(subject => subject.name) || []
+              }
+            />
+          ),
+          sort: sortBindings('Service Accounts'),
+        },
+        'age',
+      ]}
+      data={allRoles}
+      id="headlamp-rolebindings"
+    />
   );
 }

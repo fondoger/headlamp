@@ -1,55 +1,81 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import Ingress from '../../lib/k8s/ingress';
-import { timeAgo, useFilterFunc } from '../../lib/util';
+import LabelListItem from '../common/LabelListItem';
 import Link from '../common/Link';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import ResourceListView from '../common/Resource/ResourceListView';
+
+function RulesDisplay(props: { ingress: Ingress }) {
+  const { ingress } = props;
+
+  const rulesText = React.useMemo(() => {
+    const rules = ingress.getRules();
+    let labels: string[] = [];
+
+    rules.forEach(({ http }) => {
+      const text =
+        http?.paths.map(({ path, backend }) => {
+          let target = '';
+          if (!!backend.service) {
+            const service = backend.service.name;
+            const port = backend.service.port.number ?? backend.service.port.name ?? '';
+            target = `${!!service ? service + ':' + port.toString() : port.toString()}`;
+          } else if (!!backend.resource) {
+            target = `${backend.resource.kind}:${backend.resource.name}`;
+          }
+          return `${path} 🞂 ${target}`;
+        }) ?? '';
+      labels = labels.concat(text);
+    });
+
+    return labels;
+  }, [ingress]);
+
+  return <LabelListItem labels={rulesText} />;
+}
 
 export default function IngressList() {
-  const [ingresses, error] = Ingress.useList();
-  const filterFunc = useFilterFunc();
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Ingresses')} />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={Ingress.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: ingress => <Link kubeObject={ingress} />,
-            sort: (i1: Ingress, i2: Ingress) => {
-              if (i1.metadata.name < i2.metadata.name) {
-                return -1;
-              } else if (i1.metadata.name > i2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
-          },
-          {
-            label: t('glossary|Namespace'),
-            getter: ingress => ingress.getNamespace(),
-          },
-          {
-            label: t('Hosts'),
-            getter: ingress => ingress.getHosts(),
-          },
-          {
-            label: t('frequent|Age'),
-            getter: ingress => timeAgo(ingress.metadata.creationTimestamp),
-            sort: (i1: Ingress, i2: Ingress) =>
-              new Date(i2.metadata.creationTimestamp).getTime() -
-              new Date(i1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={ingresses}
-        defaultSortingColumn={4}
-      />
-    </SectionBox>
+    <ResourceListView
+      title={t('Ingresses')}
+      resourceClass={Ingress}
+      columns={[
+        'name',
+        'namespace',
+        'cluster',
+        {
+          id: 'class',
+          label: t('Class Name'),
+          getValue: ingress => ingress.spec?.ingressClassName,
+          render: ingress =>
+            ingress.spec?.ingressClassName ? (
+              <Link routeName="ingressclass" params={{ name: ingress.spec?.ingressClassName }}>
+                {ingress.spec?.ingressClassName}
+              </Link>
+            ) : null,
+        },
+        {
+          id: 'hosts',
+          label: t('Hosts'),
+          getValue: ingress =>
+            ingress
+              .getRules()
+              .map(r => r.host ?? '*')
+              .join(''),
+          render: ingress => (
+            <LabelListItem labels={ingress.getRules().map(({ host }) => host || '*')} />
+          ),
+        },
+        {
+          id: 'ports',
+          label: t('translation|Path'),
+          getValue: () => '',
+          render: (ingress: Ingress) => <RulesDisplay ingress={ingress} />,
+        },
+        'age',
+      ]}
+    />
   );
 }

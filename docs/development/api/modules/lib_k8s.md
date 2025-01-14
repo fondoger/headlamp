@@ -1,8 +1,6 @@
----
-title: "Module: lib/k8s"
-linkTitle: "lib/k8s"
-slug: "lib_k8s"
----
+[API](../API.md) / lib/k8s
+
+# Module: lib/k8s
 
 ## References
 
@@ -63,6 +61,12 @@ ___
 ### ingress
 
 Renames and re-exports [lib/k8s/ingress](lib_k8s_ingress.md)
+
+___
+
+### ingressClass
+
+Renames and re-exports [lib/k8s/ingressClass](lib_k8s_ingressClass.md)
 
 ___
 
@@ -156,7 +160,7 @@ Renames and re-exports [lib/k8s/storageClass](lib_k8s_storageClass.md)
 
 #### Defined in
 
-[lib/k8s/index.ts:149](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/index.ts#L149)
+[lib/k8s/index.ts:144](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L144)
 
 ## Variables
 
@@ -170,13 +174,19 @@ Renames and re-exports [lib/k8s/storageClass](lib_k8s_storageClass.md)
 
 #### Defined in
 
-[lib/k8s/index.ts:73](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/index.ts#L73)
+[lib/k8s/index.ts:88](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L88)
 
 ## Functions
 
 ### getVersion
 
-▸ **getVersion**(): `Promise`<[`StringDict`](../interfaces/lib_k8s_cluster.StringDict.md)\>
+▸ **getVersion**(`clusterName?`): `Promise`<[`StringDict`](../interfaces/lib_k8s_cluster.StringDict.md)\>
+
+#### Parameters
+
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `clusterName` | `string` | `''` |
 
 #### Returns
 
@@ -184,7 +194,73 @@ Renames and re-exports [lib/k8s/storageClass](lib_k8s_storageClass.md)
 
 #### Defined in
 
-[lib/k8s/index.ts:145](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/index.ts#L145)
+[lib/k8s/index.ts:140](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L140)
+
+___
+
+### labelSelectorToQuery
+
+▸ **labelSelectorToQuery**(`labelSelector`): `string`
+
+See [Label selector examples](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#list-and-watch-filtering),
+[deployment selector example](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#resources-that-support-set-based-requirements),
+[possible operators](https://github.com/kubernetes/apimachinery/blob/be3a79b26814a8d7637d70f4d434a4626ee1c1e7/pkg/selection/operator.go#L24), and
+[Format rule for expressions](https://github.com/kubernetes/apimachinery/blob/be3a79b26814a8d7637d70f4d434a4626ee1c1e7/pkg/labels/selector.go#L305).
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `labelSelector` | [`LabelSelector`](../interfaces/lib_k8s_cluster.LabelSelector.md) |
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[lib/k8s/index.ts:174](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L174)
+
+___
+
+### matchExpressionSimplifier
+
+▸ **matchExpressionSimplifier**(`matchExpressions`): `string`[] \| ``""``
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `matchExpressions` | `undefined` \| { `key`: `string` ; `operator`: `string` ; `values`: `string`[]  }[] |
+
+#### Returns
+
+`string`[] \| ``""``
+
+#### Defined in
+
+[lib/k8s/index.ts:209](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L209)
+
+___
+
+### matchLabelsSimplifier
+
+▸ **matchLabelsSimplifier**(`matchLabels`, `isEqualSeperator?`): `string`[] \| ``""``
+
+#### Parameters
+
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `matchLabels` | `undefined` \| { `[key: string]`: `string`;  } | `undefined` |
+| `isEqualSeperator` | `boolean` | `false` |
+
+#### Returns
+
+`string`[] \| ``""``
+
+#### Defined in
+
+[lib/k8s/index.ts:189](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L189)
 
 ___
 
@@ -198,21 +274,53 @@ ___
 
 #### Defined in
 
-[lib/k8s/index.ts:128](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/index.ts#L128)
+[lib/k8s/index.ts:112](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L112)
 
 ___
 
 ### useClustersConf
 
-▸ **useClustersConf**(): [`ConfigState`](../interfaces/redux_reducers_config.ConfigState.md)[``"clusters"``]
+▸ **useClustersConf**(): `ConfigState`[``"allClusters"``]
+
+Hook for getting or fetching the clusters configuration.
+This gets the clusters from the redux store. The redux store is updated
+when the user changes the configuration. The configuration is stored in
+the local storage. When stateless clusters are present, it combines the
+stateless clusters with the clusters from the redux store.
 
 #### Returns
 
-[`ConfigState`](../interfaces/redux_reducers_config.ConfigState.md)[``"clusters"``]
+`ConfigState`[``"allClusters"``]
+
+the clusters configuration.
 
 #### Defined in
 
-[lib/k8s/index.ts:80](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/index.ts#L80)
+[lib/k8s/index.ts:97](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L97)
+
+___
+
+### useClustersVersion
+
+▸ **useClustersVersion**(`clusters`): readonly [{ `[cluster: string]`: [`StringDict`](../interfaces/lib_k8s_cluster.StringDict.md);  }, { `[cluster: string]`: [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md) \| ``null``;  }]
+
+Hook to get the version of the clusters given by the parameter.
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `clusters` | [`Cluster`](../interfaces/lib_k8s_cluster.Cluster.md)[] |
+
+#### Returns
+
+readonly [{ `[cluster: string]`: [`StringDict`](../interfaces/lib_k8s_cluster.StringDict.md);  }, { `[cluster: string]`: [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md) \| ``null``;  }]
+
+a map with cluster -> version-info, and a map with cluster -> error.
+
+#### Defined in
+
+[lib/k8s/index.ts:286](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L286)
 
 ___
 
@@ -232,4 +340,4 @@ ___
 
 #### Defined in
 
-[lib/k8s/index.ts:151](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/index.ts#L151)
+[lib/k8s/index.ts:146](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/index.ts#L146)
