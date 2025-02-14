@@ -1,95 +1,26 @@
-import { makeStyles } from '@material-ui/core/styles';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import DetailsViewPluginRenderer from '../../helpers/renderHelpers';
-import { ApiError, apiFactory } from '../../lib/k8s/apiProxy';
-import CRD, { KubeCRD } from '../../lib/k8s/crd';
-import { timeAgo } from '../../lib/util';
-import { Link } from '../common';
+import { ApiError } from '../../lib/k8s/apiProxy';
+import CRD from '../../lib/k8s/crd';
+import { Link, ObjectEventList } from '../common';
 import Loader from '../common/Loader';
 import { ConditionsTable, MainInfoSection, PageGrid } from '../common/Resource';
 import { SectionBox } from '../common/SectionBox';
 import SimpleTable from '../common/SimpleTable';
-
-function getAPIForCRD(item: KubeCRD) {
-  const group = item.spec.group;
-  const version = item.spec.version;
-  const name = item.spec.names.plural as string;
-
-  let versions: any[] = [];
-  if (!version && item.spec.versions.length > 0) {
-    item.spec.versions.map(versionItem => {
-      versions.unshift([group, versionItem.name, name]);
-    });
-  } else {
-    versions = [[group, version, name]];
-  }
-
-  return apiFactory(...versions);
-}
-
-const useStyle = makeStyles({
-  link: {
-    cursor: 'pointer',
-  },
-});
-
-function CustomResourceLink(props: { resource: KubeCRD; crd: CRD; [otherProps: string]: any }) {
-  const classes = useStyle();
-  const { resource, crd, ...otherProps } = props;
-
-  return (
-    <Link
-      className={classes.link}
-      routeName="customresource"
-      params={{
-        crName: resource.metadata.name,
-        crd: crd.metadata.name,
-        namespace: resource.metadata.namespace || '-',
-      }}
-      {...otherProps}
-    >
-      {resource.metadata.name}
-    </Link>
-  );
-}
+import DetailsViewSection from '../DetailsViewSection';
+import { CustomResourceListTable } from './CustomResourceList';
 
 export default function CustomResourceDefinitionDetails() {
   const { name } = useParams<{ name: string }>();
   const [item, setItem] = React.useState<CRD | null>(null);
   const [error, setError] = React.useState<ApiError | null>(null);
-  const [objects, setObjects] = React.useState<KubeCRD[] | null>([]);
-  const [objectsError, setObjectsError] = React.useState<string | null>(null);
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   CRD.useApiGet(setItem, name, undefined, setError);
 
-  React.useEffect(() => {
-    let promise: Promise<any> | null = null;
-    if (item) {
-      promise = getAPIForCRD(item.jsonData).list(
-        items => {
-          setObjectsError(null);
-          setObjects(items);
-        },
-        err => {
-          console.error(`Failed to get objects for CRD: ${item} . Error: ${err}`);
-          setObjectsError(t('crd|Failed to get objects'));
-          setObjects(null);
-        }
-      );
-    }
-
-    return function cleanup() {
-      if (promise) {
-        promise.then((cancellable: () => void) => cancellable());
-      }
-    };
-  }, [item]);
-
   return !item ? (
-    <Loader title={t('resource|Loading resource definition details')} />
+    <Loader title={t('translation|Loading resource definition details')} />
   ) : (
     <PageGrid>
       <MainInfoSection
@@ -98,11 +29,11 @@ export default function CustomResourceDefinitionDetails() {
         extraInfo={
           item && [
             {
-              name: t('frequent|Group'),
+              name: t('translation|Group'),
               value: item.spec.group,
             },
             {
-              name: t('Version'),
+              name: t('translation|Version'),
               value: item.spec.version,
             },
             {
@@ -114,10 +45,28 @@ export default function CustomResourceDefinitionDetails() {
               value: item.spec.subresources && Object.keys(item.spec.subresources).join(' & '),
               hide: !item.spec.subresources,
             },
+            {
+              name: t('Resource'),
+              value: (
+                <Link
+                  routeName="customresources"
+                  params={{
+                    crd: item.metadata.name,
+                  }}
+                >
+                  {item.spec.names.kind}
+                </Link>
+              ),
+            },
+            {
+              name: t('translation|Categories'),
+              value: item.getCategories().join(', '),
+              hide: item.getCategories().length === 0,
+            },
           ]
         }
       />
-      <SectionBox title={t('crd|Accepted Names')}>
+      <SectionBox title={t('translation|Accepted Names')}>
         <SimpleTable
           data={[item.spec.names]}
           columns={[
@@ -138,14 +87,15 @@ export default function CustomResourceDefinitionDetails() {
               datum: 'listKind',
             },
           ]}
+          reflectInURL="acceptedNames"
         />
       </SectionBox>
-      <SectionBox title={t('frequent|Versions')}>
+      <SectionBox title={t('translation|Versions')}>
         <SimpleTable
           data={item.spec.versions}
           columns={[
             {
-              label: t('frequent|Name'),
+              label: t('translation|Name'),
               datum: 'name',
             },
             {
@@ -157,32 +107,15 @@ export default function CustomResourceDefinitionDetails() {
               getter: version => version.storage.toString(),
             },
           ]}
+          reflectInURL="versions"
         />
       </SectionBox>
-      <SectionBox title={t('Conditions')}>
+      <SectionBox title={t('translation|Conditions')}>
         <ConditionsTable resource={item.jsonData} showLastUpdate={false} />
       </SectionBox>
-      <SectionBox title={t('Objects')}>
-        <SimpleTable
-          data={objects}
-          errorMessage={objectsError}
-          columns={[
-            {
-              label: t('frequent|Name'),
-              getter: obj => <CustomResourceLink resource={obj} crd={item} />,
-            },
-            {
-              label: t('glossary|Namespace'),
-              getter: obj => obj.metadata.namespace || '-',
-            },
-            {
-              label: t('Created'),
-              getter: obj => timeAgo(obj.metadata.creationTimestamp),
-            },
-          ]}
-        />
-      </SectionBox>
-      <DetailsViewPluginRenderer resource={item} />
+      <CustomResourceListTable title={t('Objects')} crd={item} />
+      <DetailsViewSection resource={item} />
+      {item && <ObjectEventList object={item} />}
     </PageGrid>
   );
 }

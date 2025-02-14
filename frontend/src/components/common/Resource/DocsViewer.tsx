@@ -1,54 +1,74 @@
 import { Icon } from '@iconify/react';
-import Box from '@material-ui/core/Box';
-import { makeStyles } from '@material-ui/core/styles';
-import Typography from '@material-ui/core/Typography';
-import TreeItem from '@material-ui/lab/TreeItem';
-import TreeView from '@material-ui/lab/TreeView';
-import _ from 'lodash';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import { TreeItem } from '@mui/x-tree-view/TreeItem';
+import { TreeView } from '@mui/x-tree-view/TreeView';
+// import * as buffer from 'buffer';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import getDocDefinitions from '../../../lib/docs';
 import Empty from '../EmptyContent';
 import Loader from '../Loader';
 
-const useStyles = makeStyles(() => ({
-  root: {
-    height: 216,
-    flexGrow: 1,
-    maxWidth: 400,
-  },
-}));
+// Buffer class is not polyffiled with CRA(v5) so we manually do it here
+// window.Buffer = buffer.Buffer;
 
-// @todo: Declare strict types.
-function DocsViewer(props: { docSpecs: any }) {
-  const { docSpecs } = props;
-  const classes = useStyles();
-  const [docs, setDocs] = React.useState<object | null>(null);
-  const [docsError, setDocsError] = React.useState<string | null>(null);
-  const { t } = useTranslation('resource');
+export interface DocsViewerProps {
+  // @todo: Declare strict types.
+  docSpecs: any;
+  // An override for testing/mocking purposes.
+  fetchDocDefinitions?: (apiVersion: string, kind: string) => Promise<any>;
+}
+
+function DocsViewer(props: DocsViewerProps) {
+  const { docSpecs, fetchDocDefinitions = getDocDefinitions } = props;
+  const [docs, setDocs] = React.useState<
+    (
+      | {
+          data: null;
+          error: any;
+          kind: string;
+        }
+      | {
+          data: any;
+          error: null;
+          kind: string;
+        }
+      | undefined
+    )[]
+  >([]);
+  const [docsLoading, setDocsLoading] = React.useState(false);
+  const { t } = useTranslation();
 
   React.useEffect(() => {
-    setDocsError(null);
-
-    if (docSpecs.error) {
-      t('Cannot load documentation: {{ docsError }}', { docsError: docSpecs.error });
-      return;
-    }
-    if (!docSpecs.apiVersion || !docSpecs.kind) {
-      setDocsError(
-        t(
-          'Cannot load documentation: Please make sure the YAML is valid and has the kind and apiVersion set.'
-        )
-      );
-      return;
-    }
-
-    getDocDefinitions(docSpecs.apiVersion, docSpecs.kind)
-      .then(result => {
-        setDocs(result?.properties || {});
+    setDocsLoading(true);
+    // fetch docSpecs for all the resources specified
+    Promise.allSettled(
+      docSpecs.map((docSpec: { apiVersion: string; kind: string }) => {
+        return fetchDocDefinitions(docSpec.apiVersion, docSpec.kind);
       })
-      .catch(err => {
-        setDocsError(t('Cannot load documentation: {{err}}', { err }));
+    )
+      .then(values => {
+        const docSpecsFromApi = values.map((value, index) => {
+          if (value.status === 'fulfilled') {
+            return {
+              data: value.value,
+              error: null,
+              kind: docSpecs[index].kind,
+            };
+          } else if (value.status === 'rejected') {
+            return {
+              data: null,
+              error: value.reason,
+              kind: docSpecs[index].kind,
+            };
+          }
+        });
+        setDocsLoading(false);
+        setDocs(docSpecsFromApi);
+      })
+      .catch(() => {
+        setDocsLoading(false);
       });
   }, [docSpecs]);
 
@@ -74,29 +94,53 @@ function DocsViewer(props: { docSpecs: any }) {
     );
   }
 
-  return docs === null && docsError === null ? (
-    <Loader title={t('Loading documentation')} />
-  ) : !_.isEmpty(docsError) ? (
-    <Empty color="error">{docsError}</Empty>
-  ) : _.isEmpty(docs) ? (
-    <Empty>
-      {t('No documentation for type {{ docsType }}.', { docsType: docSpecs.kind.trim() })}
-    </Empty>
-  ) : (
-    <Box p={4}>
-      <Typography>
-        {t('Showing documentation for: {{ docsType }}', {
-          docsType: docSpecs.kind.trim(),
-        })}
-      </Typography>
-      <TreeView
-        className={classes.root}
-        defaultCollapseIcon={<Icon icon="mdi:chevron-down" />}
-        defaultExpandIcon={<Icon icon="mdi:chevron-right" />}
-      >
-        {Object.entries(docs || {}).map(([name, value], i) => makeItems(name, value, i.toString()))}
-      </TreeView>
-    </Box>
+  return (
+    <>
+      {docsLoading ? (
+        <Loader title={t('Loading documentation')} />
+      ) : docs.length === 0 ? (
+        <Empty>{t('No documentation available.')}</Empty>
+      ) : (
+        docs.map((docSpec: any, idx: number) => {
+          if (!docSpec.error && !docSpec.data) {
+            return (
+              <Empty key={`empty_msg_${idx}`}>
+                {t('No documentation for type {{ docsType }}.', {
+                  docsType: docSpec?.kind?.trim() || '""',
+                })}
+              </Empty>
+            );
+          }
+          if (docSpec.error) {
+            return (
+              <Empty color="error" key={`empty_msg_${idx}`}>
+                {docSpec.error.message}
+              </Empty>
+            );
+          }
+          if (docSpec.data) {
+            return (
+              <Box p={2} key={`docs_${idx}`}>
+                <Typography>
+                  {t('Showing documentation for: {{ docsType }}', {
+                    docsType: docSpec.kind.trim(),
+                  })}
+                </Typography>
+                <TreeView
+                  sx={{ flexGrow: 1, maxWidth: 400 }}
+                  defaultCollapseIcon={<Icon icon="mdi:chevron-down" />}
+                  defaultExpandIcon={<Icon icon="mdi:chevron-right" />}
+                >
+                  {Object.entries(docSpec.data.properties || {}).map(([name, value], i) =>
+                    makeItems(name, value, i.toString())
+                  )}
+                </TreeView>
+              </Box>
+            );
+          }
+        })
+      )}
+    </>
   );
 }
 

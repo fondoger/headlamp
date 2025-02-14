@@ -1,29 +1,37 @@
-import { Icon } from '@iconify/react';
-import IconButton from '@material-ui/core/IconButton';
-import Tooltip from '@material-ui/core/Tooltip';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import { useLocation } from 'react-router-dom';
-import { KubeObject } from '../../../lib/k8s/cluster';
-import { KubeServiceAccount } from '../../../lib/k8s/serviceAccount';
-import { CallbackActionOptions, clusterAction } from '../../../redux/actions/actions';
+import { KubeObject } from '../../../lib/k8s/KubeObject';
+import { KubeObjectInterface } from '../../../lib/k8s/KubeObject';
+import { CallbackActionOptions, clusterAction } from '../../../redux/clusterActionSlice';
+import {
+  EventStatus,
+  HeadlampEventType,
+  useEventCallback,
+} from '../../../redux/headlampEventSlice';
+import { AppDispatch } from '../../../redux/stores/store';
+import ActionButton, { ButtonStyle } from '../ActionButton';
+import AuthVisible from './AuthVisible';
 import EditorDialog from './EditorDialog';
 import ViewButton from './ViewButton';
 
 interface EditButtonProps {
   item: KubeObject;
   options?: CallbackActionOptions;
+  buttonStyle?: ButtonStyle;
+  afterConfirm?: () => void;
 }
 
 export default function EditButton(props: EditButtonProps) {
-  const dispatch = useDispatch();
-  const { item, options = {} } = props;
+  const dispatch: AppDispatch = useDispatch();
+  const { item, options = {}, buttonStyle, afterConfirm } = props;
   const [openDialog, setOpenDialog] = React.useState(false);
-  const [visible, setVisible] = React.useState(false);
+  const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string>('');
   const location = useLocation();
-  const { t } = useTranslation('resource');
+  const { t } = useTranslation(['translation', 'resource']);
+  const dispatchHeadlampEditEvent = useEventCallback(HeadlampEventType.EDIT_RESOURCE);
 
   function makeErrorMessage(err: any) {
     const status: number = err.status;
@@ -35,7 +43,7 @@ export default function EditButton(props: EditButtonProps) {
     }
   }
 
-  async function updateFunc(newItem: KubeServiceAccount) {
+  async function updateFunc(newItem: KubeObjectInterface) {
     try {
       await item.update(newItem);
     } catch (err) {
@@ -47,59 +55,75 @@ export default function EditButton(props: EditButtonProps) {
 
   const applyFunc = React.useCallback(updateFunc, [item]);
 
-  function handleSave(newItemDef: KubeServiceAccount) {
+  function handleSave(items: KubeObjectInterface[]) {
+    const newItemDef = Array.isArray(items) ? items[0] : items;
     const cancelUrl = location.pathname;
     const itemName = item.metadata.name;
 
     setOpenDialog(false);
     dispatch(
       clusterAction(() => applyFunc(newItemDef), {
-        startMessage: t('Applying changes to {{ itemName }}…', { itemName }),
-        cancelledMessage: t('Cancelled changes to {{ itemName }}.', { itemName }),
-        successMessage: t('Applied changes to {{ itemName }}.', { itemName }),
-        errorMessage: t('Failed to apply changes to {{ itemName }}.', { itemName }),
+        startMessage: t('translation|Applying changes to {{ itemName }}…', { itemName }),
+        cancelledMessage: t('translation|Cancelled changes to {{ itemName }}.', { itemName }),
+        successMessage: t('translation|Applied changes to {{ itemName }}.', { itemName }),
+        errorMessage: t('translation|Failed to apply changes to {{ itemName }}.', { itemName }),
         cancelUrl,
         errorUrl: cancelUrl,
         ...options,
       })
     );
+
+    dispatchHeadlampEditEvent({
+      resource: item,
+      status: EventStatus.CLOSED,
+    });
+    if (afterConfirm) {
+      afterConfirm();
+    }
   }
 
-  React.useEffect(() => {
-    if (item) {
-      item
-        .getAuthorization('update')
-        .then((result: any) => {
-          if (result.status.allowed) {
-            setVisible(true);
-          }
-        })
-        .catch((err: Error) => {
-          console.error(`Error while getting authorization for edit button in ${item}:`, err);
-          setVisible(false);
-        });
-    }
-  }, [item]);
+  if (!item) {
+    return null;
+  }
 
-  if (!visible) {
+  if (isReadOnly) {
     return <ViewButton item={item} />;
   }
 
   return (
-    <React.Fragment>
-      <Tooltip title={t('frequent|Edit') as string}>
-        <IconButton aria-label={t('frequent|edit')} onClick={() => setOpenDialog(true)}>
-          <Icon icon="mdi:pencil" />
-        </IconButton>
-      </Tooltip>
-      <EditorDialog
-        item={item.jsonData}
-        open={openDialog}
-        onClose={() => setOpenDialog(false)}
-        onSave={handleSave}
-        errorMessage={errorMessage}
-        onEditorChanged={() => setErrorMessage('')}
+    <AuthVisible
+      item={item}
+      authVerb="update"
+      onError={(err: Error) => {
+        console.error(`Error while getting authorization for edit button in ${item}:`, err);
+        setIsReadOnly(true);
+      }}
+      onAuthResult={({ allowed }) => {
+        setIsReadOnly(!allowed);
+      }}
+    >
+      <ActionButton
+        description={t('translation|Edit')}
+        buttonStyle={buttonStyle}
+        onClick={() => {
+          setOpenDialog(true);
+          dispatchHeadlampEditEvent({
+            resource: item,
+            status: EventStatus.OPENED,
+          });
+        }}
+        icon="mdi:pencil"
       />
-    </React.Fragment>
+      {openDialog && (
+        <EditorDialog
+          item={item.getEditableObject()}
+          open={openDialog}
+          onClose={() => setOpenDialog(false)}
+          onSave={handleSave}
+          errorMessage={errorMessage}
+          onEditorChanged={() => setErrorMessage('')}
+        />
+      )}
+    </AuthVisible>
   );
 }

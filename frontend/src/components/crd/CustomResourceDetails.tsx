@@ -2,15 +2,16 @@ import { JSONPath } from 'jsonpath-plus';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import DetailsViewPluginRenderer from '../../helpers/renderHelpers';
 import { ResourceClasses } from '../../lib/k8s';
 import { ApiError } from '../../lib/k8s/apiProxy';
-import CustomResourceDefinition, { KubeCRD, makeCustomResourceClass } from '../../lib/k8s/crd';
+import CustomResourceDefinition, { KubeCRD } from '../../lib/k8s/crd';
+import { KubeObject } from '../../lib/k8s/KubeObject';
 import { localeDate } from '../../lib/util';
-import { HoverInfoLabel, NameValueTableRow, SectionBox } from '../common';
+import { HoverInfoLabel, Link, NameValueTableRow, ObjectEventList, SectionBox } from '../common';
 import Empty from '../common/EmptyContent';
 import Loader from '../common/Loader';
 import { ConditionsTable, MainInfoSection, PageGrid } from '../common/Resource';
+import DetailsViewSection from '../DetailsViewSection';
 
 export default function CustomResourceDetailsFromURL() {
   const params = useParams<CustomResourceDetailsProps>();
@@ -32,17 +33,23 @@ export function CustomResourceDetails(props: CustomResourceDetailsProps) {
   const { t } = useTranslation('glossary');
 
   const namespace = ns === '-' ? undefined : ns;
-  const CRD = ResourceClasses.CustomResourceDefinition as CustomResourceDefinition;
+  const CRD = ResourceClasses.CustomResourceDefinition;
 
   CRD.useApiGet(setCRD, crdName, undefined, setError);
 
   return !crd ? (
     !!error ? (
       <Empty color="error">
-        {t(`crd|Error getting custom resource definition ${crdName}: ${error.message}`)}
+        {t(
+          'translation|Error getting custom resource definition {{ crdName }}: {{ errorMessage }}',
+          {
+            crdName,
+            errorMessage: error.message,
+          }
+        )}
       </Empty>
     ) : (
-      <Loader title={t('crd|Loading custom resource details')} />
+      <Loader title={t('translation|Loading custom resource details')} />
     )
   ) : (
     <CustomResourceDetailsRenderer crd={crd} crName={crName} namespace={namespace} />
@@ -103,17 +110,15 @@ export interface CustomResourceDetailsRendererProps {
 
 function CustomResourceDetailsRenderer(props: CustomResourceDetailsRendererProps) {
   const { crd, crName, namespace } = props;
-  const [item, setItem] = React.useState<KubeCRD | null>(null);
+  const [item, setItem] = React.useState<KubeObject | null>(null);
   const [error, setError] = React.useState<ApiError | null>(null);
 
   const { t } = useTranslation('glossary');
 
-  let CRClass: ReturnType<typeof makeCustomResourceClass> | null = null;
+  const CRClass = React.useMemo(() => {
+    return crd.makeCRClass();
+  }, [crd]);
 
-  const versions: [string, string, string][] = (crd.jsonData as KubeCRD).spec.versions.map(
-    versionInfo => [crd.spec.group, versionInfo.name, crd.spec.names.plural]
-  );
-  CRClass = makeCustomResourceClass(versions, !!namespace);
   CRClass.useApiGet(setItem, crName, namespace, setError);
 
   const apiVersion = item?.jsonData.apiVersion?.split('/')[1] || '';
@@ -122,24 +127,43 @@ function CustomResourceDetailsRenderer(props: CustomResourceDetailsRendererProps
   return !item ? (
     !!error ? (
       <Empty color="error">
-        {t(`crd|Error getting custom resource ${crName}: ${error.message}`)}
+        {t('translation|Error getting custom resource {{ crName }}: {{ errorMessage }}', {
+          crName,
+          errorMessage: error.message,
+        })}
       </Empty>
     ) : (
-      <Loader title={t('crd|Loading custom resource details')} />
+      <Loader title={t('translation|Loading custom resource details')} />
     )
   ) : (
     <PageGrid>
       <MainInfoSection
         resource={item}
-        backLink={crd.detailsRoute}
-        extraInfo={getExtraInfo(extraColumns, item!.jsonData)}
+        extraInfo={[
+          {
+            name: t('glossary|Definition'),
+            value: (
+              <Link
+                routeName="crd"
+                params={{
+                  name: crd.metadata.name,
+                }}
+              >
+                {crd.metadata.name}
+              </Link>
+            ),
+          },
+          ...getExtraInfo(extraColumns, item!.jsonData as KubeCRD),
+        ]}
+        backLink=""
       />
       {item!.jsonData.status?.conditions && (
         <SectionBox>
           <ConditionsTable resource={item.jsonData} showLastUpdate={false} />
         </SectionBox>
       )}
-      <DetailsViewPluginRenderer resource={item} />
+      <DetailsViewSection resource={item} />
+      {item && <ObjectEventList object={item} />}
     </PageGrid>
   );
 }

@@ -1,6 +1,5 @@
 import { Icon, IconProps } from '@iconify/react';
-import Container from '@material-ui/core/Container';
-import { makeStyles } from '@material-ui/core/styles';
+import Container from '@mui/material/Container';
 import React from 'react';
 import TooltipLight from './TooltipLight';
 
@@ -10,17 +9,9 @@ export interface TooltipIconProps {
   icon?: IconProps['icon'];
 }
 
-const useContainerStyles = makeStyles({
-  container: {
-    display: 'inline',
-    padding: '0 .3rem',
-  },
-});
-
 const IconReffed = React.forwardRef((props: IconProps, ref: any) => {
-  const classes = useContainerStyles({});
   return (
-    <Container ref={ref} className={classes.container}>
+    <Container ref={ref} sx={{ display: 'inline', padding: '0 .3rem' }}>
       <Icon {...props} />
     </Container>
   );

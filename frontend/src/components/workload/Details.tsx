@@ -1,8 +1,7 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import DetailsViewPluginRenderer from '../../helpers/renderHelpers';
-import { KubeObject, Workload } from '../../lib/k8s/cluster';
+import { WorkloadClass } from '../../lib/k8s/Workload';
+import { Workload } from '../../lib/k8s/Workload';
 import {
   ConditionsSection,
   ContainersSection,
@@ -11,14 +10,17 @@ import {
   OwnedPodsSection,
 } from '../common/Resource';
 
-interface WorkloadDetailsProps {
-  workloadKind: KubeObject;
+interface WorkloadDetailsProps<T extends WorkloadClass> {
+  workloadKind: T;
+  name?: string;
+  namespace?: string;
 }
 
-export default function WorkloadDetails(props: WorkloadDetailsProps) {
-  const { namespace, name } = useParams<{ namespace: string; name: string }>();
+export default function WorkloadDetails<T extends WorkloadClass>(props: WorkloadDetailsProps<T>) {
+  const params = useParams<{ namespace: string; name: string }>();
+  const { name = params.name, namespace = params.namespace } = props;
   const { workloadKind } = props;
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   function renderUpdateStrategy(item: Workload) {
     if (!item?.spec?.strategy) {
@@ -49,11 +51,11 @@ export default function WorkloadDetails(props: WorkloadDetailsProps) {
     }
 
     let values: { [key: string]: string } = {
-      [t('Desired')]: item.spec.replicas,
-      [t('Ready')]: item.status.readyReplicas,
-      [t('Up to date')]: item.status.updatedReplicas,
-      [t('Available')]: item.status.availableReplicas,
-      [t('Total')]: item.status.replicas,
+      [t('translation|Desired', { context: 'replicas' })]: item.spec.replicas,
+      [t('translation|Ready', { context: 'replicas' })]: item.status.readyReplicas,
+      [t('translation|Up to date', { context: 'replicas' })]: item.status.updatedReplicas,
+      [t('translation|Available', { context: 'replicas' })]: item.status.availableReplicas,
+      [t('translation|Total')]: item.status.replicas,
     };
 
     const validEntries = Object.entries(values).filter(
@@ -81,6 +83,7 @@ export default function WorkloadDetails(props: WorkloadDetailsProps) {
     <DetailsGrid
       resourceType={workloadKind}
       name={name}
+      withEvents
       namespace={namespace}
       extraInfo={item =>
         item && [
@@ -104,18 +107,22 @@ export default function WorkloadDetails(props: WorkloadDetailsProps) {
           },
         ]
       }
-      sectionsFunc={item => (
-        <>
-          <ConditionsSection resource={item?.jsonData} />
-          {item && (
-            <>
-              <OwnedPodsSection resource={item?.jsonData} />
-              <ContainersSection resource={item?.jsonData} />
-            </>
-          )}
-          <DetailsViewPluginRenderer resource={item} />
-        </>
-      )}
+      extraSections={item =>
+        item && [
+          {
+            id: 'headlamp.workload-conditions',
+            section: <ConditionsSection resource={item?.jsonData} />,
+          },
+          {
+            id: 'headlamp.workload-owned-pods',
+            section: <OwnedPodsSection resource={item?.jsonData} />,
+          },
+          {
+            id: 'headlamp.workload-containers',
+            section: <ContainersSection resource={item?.jsonData} />,
+          },
+        ]
+      }
     />
   );
 }

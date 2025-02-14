@@ -1,8 +1,9 @@
-import Box from '@material-ui/core/Box';
-import Paper from '@material-ui/core/Paper';
-import { makeStyles, useTheme } from '@material-ui/core/styles';
-import Typography from '@material-ui/core/Typography';
-import React from 'react';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import { useTheme } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
+import React, { ReactNode } from 'react';
 import {
   Bar,
   BarChart,
@@ -16,24 +17,6 @@ import {
 } from 'recharts';
 import Loader from './Loader';
 
-const useStyle = makeStyles(() => ({
-  title: {
-    textAlign: 'center',
-    fontSize: '1.2em',
-    flexGrow: 1,
-    fontWeight: 'bold',
-  },
-  legend: {
-    textAlign: 'center',
-    fontSize: '1.1em',
-    flexGrow: 1,
-  },
-  chart: {
-    marginLeft: 'auto',
-    marginRight: 'auto',
-  },
-}));
-
 export interface ChartDataPoint {
   name: string;
   value: number;
@@ -45,17 +28,17 @@ export interface PercentageCircleProps {
   size?: number;
   dataKey?: string;
   label?: string | null;
-  title?: string | null;
-  legend?: string | null;
+  title?: ReactNode;
+  legend?: ReactNode;
   total?: number;
   totalProps?: {
     [propName: string]: any;
   };
+  thickness?: number;
 }
 
 export function PercentageCircle(props: PercentageCircleProps) {
   const theme = useTheme();
-  const classes = useStyle();
   const {
     data,
     size = 200,
@@ -65,6 +48,7 @@ export function PercentageCircle(props: PercentageCircleProps) {
     legend = null,
     total = 100,
     totalProps = {},
+    thickness = 16,
   } = props;
 
   const chartSize = size * 0.8;
@@ -109,7 +93,18 @@ export function PercentageCircle(props: PercentageCircleProps) {
       alignContent="center"
       mx="auto"
     >
-      {title && <Typography className={classes.title}>{title}</Typography>}
+      {title && (
+        <Typography
+          sx={{
+            textAlign: 'center',
+            fontSize: '1.2em',
+            flexGrow: 1,
+            fontWeight: 'bold',
+          }}
+        >
+          {title}
+        </Typography>
+      )}
       {isLoading ? (
         <Loader title={`Loading data for ${title}`} />
       ) : (
@@ -118,14 +113,17 @@ export function PercentageCircle(props: PercentageCircleProps) {
           cy={size / 2}
           width={chartSize}
           height={chartSize}
-          className={classes.chart}
+          style={{
+            marginLeft: 'auto',
+            marginRight: 'auto',
+          }}
         >
           <Pie
             data={formatData()}
             // Center the chart
             cx={chartSize / 2}
             cy={chartSize / 2}
-            innerRadius={chartSize * 0.35}
+            innerRadius={chartSize * 0.4 - thickness}
             outerRadius={chartSize * 0.4}
             dataKey={dataKey}
             // Start at the top
@@ -146,30 +144,36 @@ export function PercentageCircle(props: PercentageCircleProps) {
         </PieChart>
       )}
       {!isLoading && legend !== null && (
-        <Typography className={classes.legend}>{legend}</Typography>
+        <Typography
+          sx={{
+            textAlign: 'center',
+            fontSize: '1.1em',
+            flexGrow: 1,
+          }}
+        >
+          {legend}
+        </Typography>
       )}
     </Box>
   );
 }
 
-const useBarStyle = makeStyles(theme => ({
-  chart: {
-    zIndex: theme.zIndex.drawer,
-  },
-  container: {
-    marginLeft: 'auto',
-    marginRight: 'auto',
-  },
+const StyledResponsiveContainer = styled(ResponsiveContainer)({
+  marginLeft: 'auto',
+  marginRight: 'auto',
+});
+
+const StyledBarChart = styled(BarChart)(({ theme }) => ({
+  zIndex: theme.zIndex.drawer,
 }));
 
 export interface PercentageBarProps {
   data: ChartDataPoint[];
   total?: number;
-  tooltipFunc?: ((data: any) => JSX.Element | string) | null;
+  tooltipFunc?: ((data: any) => ReactNode) | null;
 }
 
 export function PercentageBar(props: PercentageBarProps) {
-  const classes = useBarStyle();
   const theme = useTheme();
 
   const { data, total = 100, tooltipFunc = null } = props;
@@ -185,8 +189,8 @@ export function PercentageBar(props: PercentageBarProps) {
   }
 
   return (
-    <ResponsiveContainer width="95%" height={20} className={classes.container}>
-      <BarChart layout="vertical" maxBarSize={5} data={[formatData()]} className={classes.chart}>
+    <StyledResponsiveContainer width="95%" height={20}>
+      <StyledBarChart layout="vertical" maxBarSize={5} data={[formatData()]}>
         {tooltipFunc && <Tooltip content={<PaperTooltip>{tooltipFunc(data)}</PaperTooltip>} />}
         <XAxis hide domain={[0, 100]} type="number" />
         <YAxis hide type="category" />
@@ -202,8 +206,8 @@ export function PercentageBar(props: PercentageBarProps) {
             />
           );
         })}
-      </BarChart>
-    </ResponsiveContainer>
+      </StyledBarChart>
+    </StyledResponsiveContainer>
   );
 }
 

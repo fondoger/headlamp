@@ -1,7 +1,6 @@
-import { Meta, Story } from '@storybook/react/types-6-0';
+import { Meta, StoryFn } from '@storybook/react';
 import { SnackbarProvider } from 'notistack';
-import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { TestContext } from '../../test';
 import { PureAlertNotification, PureAlertNotificationProps } from './AlertNotification';
 
 export default {
@@ -12,35 +11,23 @@ export default {
   },
   decorators: [
     Story => (
-      <MemoryRouter>
+      <TestContext>
         <SnackbarProvider>
           <Story />
         </SnackbarProvider>
-      </MemoryRouter>
+      </TestContext>
     ),
   ],
 } as Meta;
 
-const Template: Story<PureAlertNotificationProps> = args => <PureAlertNotification {...args} />;
+const Template: StoryFn<PureAlertNotificationProps> = args => <PureAlertNotification {...args} />;
 
 export const Error = Template.bind({});
 Error.args = {
-  testAuth: () => {
-    return new Promise(function (resolve, reject) {
-      reject('Offline');
-    });
-  },
-  moreRoutes: {},
-  routes: {},
+  checkerFunction: () => Promise.reject('offline'),
 };
 
 export const NoError = Template.bind({});
 NoError.args = {
-  testAuth: () => {
-    return new Promise(function (resolve) {
-      resolve('fine');
-    });
-  },
-  moreRoutes: {},
-  routes: {},
+  checkerFunction: () => Promise.resolve({ statusText: 'OK' }),
 };
