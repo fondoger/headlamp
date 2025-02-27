@@ -1,8 +1,6 @@
----
-title: "Interface: Cluster"
-linkTitle: "Cluster"
-slug: "lib_k8s_cluster.Cluster"
----
+[API](../API.md) / [lib/k8s/cluster](../modules/lib_k8s_cluster.md) / Cluster
+
+# Interface: Cluster
 
 [lib/k8s/cluster](../modules/lib_k8s_cluster.md).Cluster
 
@@ -12,13 +10,25 @@ slug: "lib_k8s_cluster.Cluster"
 
 ## Properties
 
+### auth\_type
+
+• **auth\_type**: `string`
+
+Either 'oidc' or ''. '' means unknown.
+
+#### Defined in
+
+[lib/k8s/cluster.ts:36](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L36)
+
+___
+
 ### name
 
 • **name**: `string`
 
 #### Defined in
 
-[lib/k8s/cluster.ts:16](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L16)
+[lib/k8s/cluster.ts:31](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L31)
 
 ___
 
@@ -28,4 +38,4 @@ ___
 
 #### Defined in
 
-[lib/k8s/cluster.ts:17](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L17)
+[lib/k8s/cluster.ts:32](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L32)

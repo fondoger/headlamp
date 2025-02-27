@@ -1,8 +1,6 @@
----
-title: "Class: Pod"
-linkTitle: "Pod"
-slug: "lib_k8s_pod.Pod"
----
+[API](../API.md) / [lib/k8s/pod](../modules/lib_k8s_pod.md) / Pod
+
+# Class: Pod
 
 [lib/k8s/pod](../modules/lib_k8s_pod.md).Pod
 
@@ -16,21 +14,21 @@ slug: "lib_k8s_pod.Pod"
 
 ### constructor
 
-• **new Pod**(`json`)
+• **new Pod**(`jsonData`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `json` | [`KubePod`](../interfaces/lib_k8s_pod.KubePod.md) |
+| `jsonData` | [`KubePod`](../interfaces/lib_k8s_pod.KubePod.md) |
 
-#### Inherited from
+#### Overrides
 
-makeKubeObject<KubePod\>('Pod').constructor
+makeKubeObject&lt;KubePod\&gt;(&#x27;Pod&#x27;).constructor
 
 #### Defined in
 
-[lib/k8s/cluster.ts:76](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L76)
+[lib/k8s/pod.ts:93](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L93)
 
 ## Properties
 
@@ -42,9 +40,18 @@ makeKubeObject<KubePod\>('Pod').constructor
 
 ▪ [other: `string`]: `any`
 
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `scale?` | { `get`: (`namespace`: `string`, `name`: `string`, `clusterName?`: `string`) => `Promise`<`any`\> ; `patch`: (`body`: { `spec`: { `replicas`: `number`  }  }, `metadata`: [`KubeMetadata`](../interfaces/lib_k8s_cluster.KubeMetadata.md), `clusterName?`: `string`) => `Promise`<`any`\> ; `put`: (`body`: { `metadata`: [`KubeMetadata`](../interfaces/lib_k8s_cluster.KubeMetadata.md) ; `spec`: { `replicas`: `number`  }  }, `clusterName?`: `string`) => `Promise`<`any`\>  } |
+| `scale.get` | (`namespace`: `string`, `name`: `string`, `clusterName?`: `string`) => `Promise`<`any`\> |
+| `scale.patch` | (`body`: { `spec`: { `replicas`: `number`  }  }, `metadata`: [`KubeMetadata`](../interfaces/lib_k8s_cluster.KubeMetadata.md), `clusterName?`: `string`) => `Promise`<`any`\> |
+| `scale.put` | (`body`: { `metadata`: [`KubeMetadata`](../interfaces/lib_k8s_cluster.KubeMetadata.md) ; `spec`: { `replicas`: `number`  }  }, `clusterName?`: `string`) => `Promise`<`any`\> |
+
 #### Defined in
 
-[lib/k8s/pod.ts:35](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/pod.ts#L35)
+[lib/k8s/pod.ts:90](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L90)
 
 ___
 
@@ -58,26 +65,21 @@ makeKubeObject<KubePod\>('Pod').className
 
 #### Defined in
 
-[lib/k8s/cluster.ts:77](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L77)
+[lib/k8s/cluster.ts:319](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L319)
 
 ## Accessors
 
 ### spec
 
-• `get` **spec**(): `Object`
+• `get` **spec**(): [`KubePodSpec`](../interfaces/lib_k8s_pod.KubePodSpec.md)
 
 #### Returns
 
-`Object`
-
-| Name | Type |
-| :------ | :------ |
-| `containers` | [`KubeContainer`](../interfaces/lib_k8s_cluster.KubeContainer.md)[] |
-| `nodeName` | `string` |
+[`KubePodSpec`](../interfaces/lib_k8s_pod.KubePodSpec.md)
 
 #### Defined in
 
-[lib/k8s/pod.ts:37](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/pod.ts#L37)
+[lib/k8s/pod.ts:98](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L98)
 
 ___
 
@@ -93,18 +95,47 @@ ___
 | :------ | :------ |
 | `conditions` | [`KubeCondition`](../interfaces/lib_k8s_cluster.KubeCondition.md)[] |
 | `containerStatuses` | [`KubeContainerStatus`](../interfaces/lib_k8s_cluster.KubeContainerStatus.md)[] |
-| `hostIP` | `string` |
-| `message` | `string` |
+| `ephemeralContainerStatuses?` | [`KubeContainerStatus`](../interfaces/lib_k8s_cluster.KubeContainerStatus.md)[] |
+| `hostIP?` | `string` |
+| `initContainerStatuses?` | [`KubeContainerStatus`](../interfaces/lib_k8s_cluster.KubeContainerStatus.md)[] |
+| `message?` | `string` |
 | `phase` | `string` |
-| `qosClass` | `string` |
-| `reason` | `string` |
-| `startTime` | `number` |
+| `qosClass?` | `string` |
+| `reason?` | `string` |
+| `startTime` | [`Time`](../modules/lib_k8s_cluster.md#time) |
 
 #### Defined in
 
-[lib/k8s/pod.ts:41](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/pod.ts#L41)
+[lib/k8s/pod.ts:102](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L102)
 
 ## Methods
+
+### attach
+
+▸ **attach**(`container`, `onAttach`, `options?`): `Object`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `container` | `string` |
+| `onAttach` | [`StreamResultsCb`](../modules/lib_k8s_apiProxy.md#streamresultscb) |
+| `options` | [`StreamArgs`](../interfaces/lib_k8s_apiProxy.StreamArgs.md) |
+
+#### Returns
+
+`Object`
+
+| Name | Type |
+| :------ | :------ |
+| `cancel` | () => `void` |
+| `getSocket` | () => ``null`` \| `WebSocket` |
+
+#### Defined in
+
+[lib/k8s/pod.ts:172](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L172)
+
+___
 
 ### exec
 
@@ -129,22 +160,33 @@ ___
 
 #### Defined in
 
-[lib/k8s/pod.ts:68](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/pod.ts#L68)
+[lib/k8s/pod.ts:184](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L184)
+
+___
+
+### getDetailedStatus
+
+▸ **getDetailedStatus**(): `PodDetailedStatus`
+
+#### Returns
+
+`PodDetailedStatus`
+
+#### Defined in
+
+[lib/k8s/pod.ts:222](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L222)
 
 ___
 
 ### getLogs
 
-▸ **getLogs**(`container`, `tailLines`, `showPrevious`, `onLogs`): () => `void`
+▸ **getLogs**(...`args`): () => `void`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `container` | `string` |
-| `tailLines` | `number` |
-| `showPrevious` | `boolean` |
-| `onLogs` | [`StreamResultsCb`](../modules/lib_k8s_apiProxy.md#streamresultscb) |
+| `...args` | [container: string, tailLines: number, showPrevious: boolean, onLogs: StreamResultsCb] \| [container: string, onLogs: StreamResultsCb, logsOptions: LogOptions] |
 
 #### Returns
 
@@ -158,19 +200,21 @@ ___
 
 #### Defined in
 
-[lib/k8s/pod.ts:45](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/pod.ts#L45)
+[lib/k8s/pod.ts:106](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L106)
 
 ___
 
 ### apiList
 
-▸ `Static` **apiList**(`onList`): `any`
+▸ `Static` **apiList**(`onList`, `onError?`, `opts?`): `any`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `onList` | (`arg`: `any`[]) => `void` |
+| `onError?` | (`err`: [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void` |
+| `opts?` | [`ApiListSingleNamespaceOptions`](../interfaces/lib_k8s_cluster.ApiListSingleNamespaceOptions.md) |
 
 #### Returns
 
@@ -182,7 +226,32 @@ makeKubeObject<KubePod\>('Pod').apiList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:60](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L60)
+[lib/k8s/cluster.ts:294](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L294)
+
+___
+
+### getAuthorization
+
+▸ `Static` `Optional` **getAuthorization**(`arg`, `resourceAttrs?`): `any`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `arg` | `string` |
+| `resourceAttrs?` | [`AuthRequestResourceAttrs`](../interfaces/lib_k8s_cluster.AuthRequestResourceAttrs.md) |
+
+#### Returns
+
+`any`
+
+#### Inherited from
+
+makeKubeObject<KubePod\>('Pod').getAuthorization
+
+#### Defined in
+
+[lib/k8s/cluster.ts:321](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L321)
 
 ___
 
@@ -206,7 +275,7 @@ makeKubeObject<KubePod\>('Pod').getErrorMessage
 
 #### Defined in
 
-[lib/k8s/cluster.ts:75](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L75)
+[lib/k8s/cluster.ts:317](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L317)
 
 ___
 
@@ -233,7 +302,7 @@ makeKubeObject<KubePod\>('Pod').useApiGet
 
 #### Defined in
 
-[lib/k8s/cluster.ts:66](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L66)
+[lib/k8s/cluster.ts:304](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L304)
 
 ___
 
@@ -259,7 +328,32 @@ makeKubeObject<KubePod\>('Pod').useApiList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:61](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L61)
+[lib/k8s/cluster.ts:299](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L299)
+
+___
+
+### useGet
+
+▸ `Static` **useGet**(`name`, `namespace?`): [`any`, ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md), (`item`: `any`) => `void`, (`err`: ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void`]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `namespace?` | `string` |
+
+#### Returns
+
+[`any`, ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md), (`item`: `any`) => `void`, (`err`: ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void`]
+
+#### Inherited from
+
+makeKubeObject<KubePod\>('Pod').useGet
+
+#### Defined in
+
+[lib/k8s/cluster.ts:313](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L313)
 
 ___
 
@@ -283,4 +377,4 @@ makeKubeObject<KubePod\>('Pod').useList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:72](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L72)
+[lib/k8s/cluster.ts:310](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L310)

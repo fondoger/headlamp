@@ -1,40 +1,55 @@
-import { apiFactoryWithNamespace } from './apiProxy';
-import { KubeObjectInterface, makeKubeObject } from './cluster';
+import { KubeObject, KubeObjectInterface } from './KubeObject';
 
 export interface KubePersistentVolumeClaim extends KubeObjectInterface {
-  spec: {
-    accessModes: string[];
-    resources: {
-      limits: object;
+  spec?: {
+    accessModes?: string[];
+    resources?: {
+      limits?: object;
       requests: {
         storage?: string;
         [other: string]: any;
       };
     };
-    storageClassName: string;
-    volumeMode: string;
-    volumeName: string;
+    storageClassName?: string;
+    volumeMode?: string;
+    volumeName?: string;
     [other: string]: any;
   };
-  status: {
+  status?: {
     capacity?: {
       storage?: string;
     };
-    phase: string;
+    phase?: string;
+    accessModes?: string[];
+    [other: string]: any;
   };
 }
 
-class PersistentVolumeClaim extends makeKubeObject<KubePersistentVolumeClaim>(
-  'persistentVolumeClaim'
-) {
-  static apiEndpoint = apiFactoryWithNamespace('', 'v1', 'persistentvolumeclaims');
+class PersistentVolumeClaim extends KubeObject<KubePersistentVolumeClaim> {
+  static kind = 'PersistentVolumeClaim';
+  static apiName = 'persistentvolumeclaims';
+  static apiVersion = 'v1';
+  static isNamespaced = true;
+
+  static getBaseObject(): KubePersistentVolumeClaim {
+    const baseObject = super.getBaseObject() as KubePersistentVolumeClaim;
+    baseObject.metadata = {
+      ...baseObject.metadata,
+      namespace: '',
+    };
+    baseObject.spec = {
+      storageClassName: '',
+      volumeName: '',
+    };
+    return baseObject;
+  }
 
   get spec() {
-    return this.jsonData?.spec;
+    return this.jsonData.spec;
   }
 
   get status() {
-    return this.jsonData?.status;
+    return this.jsonData.status;
   }
 }
 

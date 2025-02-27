@@ -1,62 +1,53 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import Service from '../../lib/k8s/service';
-import { useFilterFunc } from '../../lib/util';
-import Link from '../common/Link';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import LabelListItem from '../common/LabelListItem';
+import ResourceListView from '../common/Resource/ResourceListView';
 
 export default function ServiceList() {
-  const [services, error] = Service.useList();
-  const filterFunc = useFilterFunc(['.jsonData.spec.type']);
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Services')} />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={Service.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: service => <Link kubeObject={service} />,
-            sort: (s1: Service, s2: Service) => {
-              if (s1.metadata.name < s2.metadata.name) {
-                return -1;
-              } else if (s1.metadata.name > s2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
-          },
-          {
-            label: t('glossary|Namespace'),
-            getter: service => service.getNamespace(),
-            sort: true,
-          },
-          {
-            label: t('Type'),
-            getter: service => service.spec.type,
-            sort: true,
-          },
-          {
-            label: t('Cluster IP'),
-            getter: service => service.spec.clusterIP,
-            sort: true,
-          },
-          {
-            label: t('frequent|Age'),
-            getter: service => service.getAge(),
-            sort: (s1: Service, s2: Service) =>
-              new Date(s2.metadata.creationTimestamp).getTime() -
-              new Date(s1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={services}
-        defaultSortingColumn={5}
-      />
-    </SectionBox>
+    <ResourceListView
+      title={t('Services')}
+      resourceClass={Service}
+      columns={[
+        'name',
+        'namespace',
+        'cluster',
+        {
+          id: 'type',
+          label: t('translation|Type'),
+          gridTemplate: 'min-content',
+          getValue: service => service.spec.type,
+        },
+        {
+          id: 'clusterIP',
+          label: t('Cluster IP'),
+          gridTemplate: 'min-content',
+          getValue: service => service.spec.clusterIP,
+        },
+        {
+          id: 'externalIP',
+          label: t('External IP'),
+          gridTemplate: 'min-content',
+          getValue: service => service.getExternalAddresses(),
+        },
+        {
+          id: 'ports',
+          label: t('Ports'),
+          gridTemplate: 'auto',
+          getValue: service => service.getPorts()?.join(', '),
+          render: service => <LabelListItem labels={service.getPorts() ?? []} />,
+        },
+        {
+          id: 'selector',
+          label: t('Selector'),
+          gridTemplate: 'auto',
+          getValue: service => service.getSelector().join(', '),
+          render: service => <LabelListItem labels={service.getSelector()} />,
+        },
+        'age',
+      ]}
+    />
   );
 }

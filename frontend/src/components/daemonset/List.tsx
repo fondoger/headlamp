@@ -1,57 +1,99 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { KubeContainer } from '../../lib/k8s/cluster';
 import DaemonSet from '../../lib/k8s/daemonSet';
-import { useFilterFunc } from '../../lib/util';
-import { Link } from '../common';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import { LightTooltip } from '../common';
+import ResourceListView from '../common/Resource/ResourceListView';
 
 export default function DaemonSetList() {
-  const [daemonSets, error] = DaemonSet.useList();
-  const filterFunc = useFilterFunc();
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Daemon Sets')} />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={DaemonSet.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: daemonSet => <Link kubeObject={daemonSet} />,
-            sort: (d1: DaemonSet, d2: DaemonSet) => {
-              if (d1.metadata.name < d2.metadata.name) {
-                return -1;
-              } else if (d1.metadata.name > d2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
+    <ResourceListView
+      title={t('Daemon Sets')}
+      resourceClass={DaemonSet}
+      columns={[
+        'name',
+        'namespace',
+        'cluster',
+        {
+          id: 'pods',
+          label: t('Pods'),
+          getValue: daemonSet => daemonSet.status?.currentNumberScheduled || 0,
+          gridTemplate: 0.6,
+        },
+        {
+          id: 'currentPods',
+          label: t('translation|Current'),
+          getValue: daemonSet => daemonSet.status?.currentNumberScheduled || 0,
+          gridTemplate: 0.6,
+        },
+        {
+          id: 'desiredPods',
+          label: t('translation|Desired', { context: 'pods' }),
+          getValue: daemonSet => daemonSet.status?.desiredNumberScheduled || 0,
+          gridTemplate: 0.6,
+        },
+        {
+          id: 'readyPods',
+          label: t('translation|Ready'),
+          getValue: daemonSet => daemonSet.status?.numberReady || 0,
+          gridTemplate: 0.6,
+        },
+        {
+          id: 'nodeSelector',
+          label: t('Node Selector'),
+          getValue: daemonSet => daemonSet.getNodeSelectors().join(', '),
+          render: daemonSet => {
+            const selectors = daemonSet.getNodeSelectors();
+            const nodeSelectorTooltip = selectors.join('\n');
+            const nodeSelectorText = selectors.join(', ');
+            return (
+              <LightTooltip title={nodeSelectorTooltip} interactive>
+                {nodeSelectorText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('glossary|Namespace'),
-            getter: daemonSet => daemonSet.getNamespace(),
-            sort: true,
+        },
+        {
+          id: 'containers',
+          label: t('Containers'),
+          getValue: daemonSet =>
+            daemonSet
+              .getContainers()
+              .map((c: KubeContainer) => c.name)
+              .join(', '),
+          render: daemonSet => {
+            const containerNames = daemonSet.getContainers().map((c: KubeContainer) => c.name);
+            const containerText = containerNames.join(', ');
+            const containerTooltip = containerNames.join('\n');
+            return (
+              <LightTooltip title={containerTooltip} interactive>
+                {containerText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('Pods'),
-            getter: daemonSet => daemonSet.status.currentNumberScheduled,
-            sort: true,
+        },
+        {
+          id: 'images',
+          label: t('Images'),
+          getValue: daemonSet =>
+            daemonSet
+              .getContainers()
+              .map((c: KubeContainer) => c.image)
+              .join(', '),
+          render: daemonSet => {
+            const images = daemonSet.getContainers().map((c: KubeContainer) => c.image);
+            const imageTooltip = images.join('\n');
+            const imageText = images.join(', ');
+            return (
+              <LightTooltip title={imageTooltip} interactive>
+                {imageText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('frequent|Age'),
-            getter: daemonSet => daemonSet.getAge(),
-            sort: (d1: DaemonSet, d2: DaemonSet) =>
-              new Date(d2.metadata.creationTimestamp).getTime() -
-              new Date(d1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={daemonSets}
-        defaultSortingColumn={4}
-      />
-    </SectionBox>
+        },
+        'age',
+      ]}
+    />
   );
 }

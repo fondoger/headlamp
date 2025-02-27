@@ -1,67 +1,272 @@
 import { InlineIcon } from '@iconify/react';
-import Box from '@material-ui/core/Box';
-import Grid from '@material-ui/core/Grid';
-import React from 'react';
+import { Paper } from '@mui/material';
+import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
+import _ from 'lodash';
+import { useSnackbar } from 'notistack';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDispatch } from 'react-redux';
 import { useParams } from 'react-router-dom';
-import DetailsViewPluginRenderer from '../../helpers/renderHelpers';
+import { apply, drainNode, drainNodeStatus } from '../../lib/k8s/apiProxy';
 import { KubeMetrics } from '../../lib/k8s/cluster';
 import Node from '../../lib/k8s/node';
-import { timeAgo } from '../../lib/util';
+import { getCluster, timeAgo } from '../../lib/util';
+import { DefaultHeaderAction } from '../../redux/actionButtonsSlice';
+import { clusterAction } from '../../redux/clusterActionSlice';
+import { AppDispatch } from '../../redux/stores/store';
 import { CpuCircularChart, MemoryCircularChart } from '../cluster/Charts';
-import { StatusLabelProps } from '../common';
+import { ActionButton, ConfirmDialog, StatusLabelProps } from '../common';
 import { HeaderLabel, StatusLabel, ValueLabel } from '../common/Label';
-import { DetailsGrid, OwnedPodsSection } from '../common/Resource';
+import { ConditionsSection, DetailsGrid, OwnedPodsSection } from '../common/Resource';
+import AuthVisible from '../common/Resource/AuthVisible';
 import { SectionBox } from '../common/SectionBox';
 import { NameValueTable } from '../common/SimpleTable';
+import { NodeTaintsLabel } from './utils';
 
-export default function NodeDetails() {
-  const { name } = useParams<{ name: string }>();
-  const { t } = useTranslation('glossary');
+function NodeConditionsLabel(props: { node: Node }) {
+  const { node } = props;
+  const unschedulable = node?.jsonData?.spec?.unschedulable;
+  const { t } = useTranslation();
+  return unschedulable ? (
+    <StatusLabel status="warning">{t('translation|Scheduling Disabled')}</StatusLabel>
+  ) : (
+    <StatusLabel status="success">{t('translation|Scheduling Enabled')}</StatusLabel>
+  );
+}
 
+export default function NodeDetails(props: { name?: string }) {
+  const params = useParams<{ name: string }>();
+  const { name = params.name } = props;
+  const { t } = useTranslation(['glossary']);
+  const dispatch: AppDispatch = useDispatch();
+
+  const { enqueueSnackbar } = useSnackbar();
   const [nodeMetrics, metricsError] = Node.useMetrics();
-
+  const [isupdatingNodeScheduleProperty, setisUpdatingNodeScheduleProperty] = React.useState(false);
+  const [isNodeDrainInProgress, setisNodeDrainInProgress] = React.useState(false);
+  const [nodeFromAPI, nodeError] = Node.useGet(name);
+  const [node, setNode] = useState(nodeFromAPI);
   const noMetrics = metricsError?.status === 404;
+  const [drainDialogOpen, setDrainDialogOpen] = useState(false);
+
+  useEffect(() => {
+    setNode(nodeFromAPI);
+  }, [nodeFromAPI]);
 
   function getAddresses(item: Node) {
-    return item.status.addresses.map(({ type, address }) => {
-      return {
-        name: type,
-        value: address,
-      };
-    });
+    return (
+      item.status.addresses?.map(({ type, address }) => {
+        return {
+          name: type,
+          value: address,
+        };
+      }) || []
+    );
+  }
+
+  function handleNodeScheduleState(node: Node, cordon: boolean) {
+    setisUpdatingNodeScheduleProperty(true);
+    const cloneNode = _.cloneDeep(node);
+
+    cloneNode.spec.unschedulable = !cordon;
+    dispatch(
+      clusterAction(
+        () =>
+          apply(cloneNode.jsonData)
+            .then(() => {
+              setNode(cloneNode);
+            })
+            .finally(() => {
+              setisUpdatingNodeScheduleProperty(false);
+            }),
+        {
+          startMessage: cordon
+            ? t('Uncordoning node {{name}}…', {
+                name: node.metadata.name,
+              })
+            : t('Cordoning node {{name}}…', { name: node.metadata.name }),
+          successMessage: cordon
+            ? t('Uncordoned node {{name}}.', { name: node.metadata.name })
+            : t('Cordoned node {{name}}.', { name: node.metadata.name }),
+          errorMessage: cordon
+            ? t('Failed to uncordon node {{name}}.', { name: node.metadata.name })
+            : t('Failed to cordon node {{name}}.', { name: node.metadata.name }),
+          cancelledMessage: cordon
+            ? t('Uncordon node {{name}} cancelled.', { name: node.metadata.name })
+            : t('Cordon node {{name}} cancelled.', { name: node.metadata.name }),
+          cancelCallback: () => {
+            setisUpdatingNodeScheduleProperty(false);
+          },
+        }
+      )
+    );
+  }
+
+  function getDrainNodeStatus(cluster: string, nodeName: string) {
+    setTimeout(() => {
+      drainNodeStatus(cluster, nodeName)
+        .then(data => {
+          if (data && data.id.startsWith('error')) {
+            enqueueSnackbar(data.id, { variant: 'error' });
+            return;
+          }
+          if (data && data.id !== 'success') {
+            getDrainNodeStatus(cluster, nodeName);
+            return;
+          }
+          const cloneNode = _.cloneDeep(node);
+
+          cloneNode!.spec.unschedulable = !node!.spec.unschedulable;
+          setNode(cloneNode);
+        })
+        .catch(error => {
+          enqueueSnackbar(error.message, { variant: 'error' });
+        });
+    }, 1000);
+  }
+
+  function toggleDrainDialogVisibility() {
+    setDrainDialogOpen(drainDialogOpen => !drainDialogOpen);
+  }
+
+  function handleNodeDrain(node: Node) {
+    const cluster = getCluster();
+    if (!cluster) return;
+
+    setisNodeDrainInProgress(true);
+    dispatch(
+      clusterAction(
+        () =>
+          drainNode(cluster, node.metadata.name)
+            .then(() => {
+              getDrainNodeStatus(cluster, node.metadata.name);
+            })
+            .catch(error => {
+              enqueueSnackbar(error.message, { variant: 'error' });
+            })
+            .finally(() => {
+              setisNodeDrainInProgress(false);
+            }),
+        {
+          startMessage: t('Draining node {{name}}…', { name: node.metadata.name }),
+          successMessage: t('Drained node {{name}}.', { name: node.metadata.name }),
+          errorMessage: t('Failed to drain node {{name}}.', { name: node.metadata.name }),
+          cancelledMessage: t('Draining node {{name}} cancelled.', { name: node.metadata.name }),
+          cancelCallback: () => {
+            setisNodeDrainInProgress(false);
+          },
+        }
+      )
+    );
+  }
+
+  function DrainDialog() {
+    return (
+      <>
+        <ConfirmDialog
+          title={t('Drain Node')}
+          description={t('Are you sure you want to drain the node {{name}}?', {
+            name: node?.metadata.name,
+          })}
+          onConfirm={() => {
+            setDrainDialogOpen(false);
+            handleNodeDrain(node!);
+          }}
+          handleClose={() => setDrainDialogOpen(false)}
+          open={drainDialogOpen}
+        />
+      </>
+    );
   }
 
   return (
-    <DetailsGrid
-      headerSection={item => (
-        <ChartsSection node={item} metrics={nodeMetrics} noMetrics={noMetrics} />
-      )}
-      resourceType={Node}
-      name={name}
-      extraInfo={item =>
-        item && [
-          {
-            name: t('frequent|Ready'),
-            value: <NodeReadyLabel node={item} />,
-          },
-          {
-            name: t('Pod CIDR'),
-            value: item.spec.podCIDR,
-          },
-          ...getAddresses(item),
-        ]
-      }
-      sectionsFunc={item =>
-        !!item && (
-          <>
-            <SystemInfoSection node={item} />
-            <OwnedPodsSection resource={item?.jsonData} />
-            <DetailsViewPluginRenderer resource={item} />
-          </>
-        )
-      }
-    />
+    <>
+      <DrainDialog />
+      <DetailsGrid
+        resourceType={Node}
+        name={name}
+        error={nodeError}
+        headerSection={item => (
+          <ChartsSection node={item} metrics={nodeMetrics} noMetrics={noMetrics} />
+        )}
+        withEvents
+        actions={item => {
+          const cordon = item?.jsonData?.spec?.unschedulable;
+          const cordonOrUncordon = cordon ? t('Uncordon') : t('Cordon');
+
+          return [
+            {
+              id: DefaultHeaderAction.NODE_TOGGLE_CORDON,
+              action: (
+                <AuthVisible item={item} authVerb="update">
+                  <ActionButton
+                    description={cordonOrUncordon}
+                    icon={cordon ? 'mdi:check-circle-outline' : 'mdi:cancel'}
+                    onClick={() => handleNodeScheduleState(item!, cordon)}
+                    iconButtonProps={{
+                      disabled: isupdatingNodeScheduleProperty,
+                    }}
+                  />
+                </AuthVisible>
+              ),
+            },
+            {
+              id: DefaultHeaderAction.NODE_DRAIN,
+              action: (
+                <AuthVisible item={item} authVerb="delete">
+                  <ActionButton
+                    description={t('Drain')}
+                    icon="mdi:delete-variant"
+                    onClick={() => toggleDrainDialogVisibility()}
+                    iconButtonProps={{
+                      disabled: isNodeDrainInProgress,
+                    }}
+                  />
+                </AuthVisible>
+              ),
+            },
+          ];
+        }}
+        extraInfo={item =>
+          item && [
+            {
+              name: t('translation|Taints'),
+              value: <NodeTaintsLabel node={item} />,
+            },
+            {
+              name: t('translation|Ready'),
+              value: <NodeReadyLabel node={item} />,
+            },
+            {
+              name: t('translation|Conditions'),
+              value: <NodeConditionsLabel node={item} />,
+            },
+            {
+              name: t('Pod CIDR'),
+              value: item.spec.podCIDR,
+            },
+            ...getAddresses(item),
+          ]
+        }
+        extraSections={item =>
+          item && [
+            {
+              id: 'headlamp.node-system-info',
+              section: <SystemInfoSection node={item} />,
+            },
+            {
+              id: 'headlamp.node-conditions',
+              section: <ConditionsSection resource={item} />,
+            },
+            {
+              id: 'headlamp.node-owned-pods',
+              section: <OwnedPodsSection resource={item?.jsonData} />,
+            },
+          ]
+        }
+      />
+    </>
   );
 }
 
@@ -80,30 +285,41 @@ function ChartsSection(props: ChartsSectionProps) {
       return '…';
     }
 
-    const readyInfo = node.status.conditions.find(({ type }) => type === 'Ready');
+    const readyInfo = node.status.conditions?.find(({ type }) => type === 'Ready');
     if (readyInfo) {
       return timeAgo(readyInfo.lastTransitionTime as string);
     }
 
-    return t('frequent|Not ready yet!');
+    return t('translation|Not ready yet!');
   }
 
   return (
     <Box py={2}>
       <Grid
         container
-        justifyContent="space-around"
         style={{
           marginBottom: '2rem',
         }}
+        alignItems="stretch"
+        spacing={2}
       >
-        <Grid item>
-          <HeaderLabel value={getUptime()} label={t('Uptime')} />
+        <Grid item xs={4}>
+          <Paper
+            sx={theme => ({
+              background: theme.palette.squareButton.background,
+              padding: theme.spacing(2),
+              height: '100%',
+              maxWidth: '300px',
+              margin: '0 auto',
+            })}
+          >
+            <HeaderLabel value={getUptime()} label={t('Uptime')} />
+          </Paper>
         </Grid>
-        <Grid item>
+        <Grid item xs={4}>
           <CpuCircularChart items={node && [node]} itemsMetrics={metrics} noMetrics={noMetrics} />
         </Grid>
-        <Grid item>
+        <Grid item xs={4}>
           <MemoryCircularChart
             items={node && [node]}
             itemsMetrics={metrics}
@@ -138,7 +354,7 @@ function SystemInfoSection(props: SystemInfoSectionProps) {
     );
   }
 
-  if (!node) {
+  if (!node || !node.status.nodeInfo) {
     return null;
   }
 
@@ -198,7 +414,7 @@ interface NodeReadyLabelProps {
 
 export function NodeReadyLabel(props: NodeReadyLabelProps) {
   const { node } = props;
-  const isReady = !!node.status.conditions.find(
+  const isReady = !!node.status.conditions?.find(
     condition => condition.type === 'Ready' && condition.status === 'True'
   );
   const { t } = useTranslation();
@@ -207,10 +423,10 @@ export function NodeReadyLabel(props: NodeReadyLabelProps) {
   let label = null;
   if (isReady) {
     status = 'success';
-    label = t('frequent|Yes');
+    label = t('translation|Yes');
   } else {
     status = 'error';
-    label = t('frequent|No');
+    label = t('translation|No');
   }
 
   return <StatusLabel status={status}>{label}</StatusLabel>;

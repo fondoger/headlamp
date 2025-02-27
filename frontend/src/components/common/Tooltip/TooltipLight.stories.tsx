@@ -1,8 +1,7 @@
 import { Icon } from '@iconify/react';
-import IconButton from '@material-ui/core/IconButton';
-import { Meta, Story } from '@storybook/react/types-6-0';
+import IconButton from '@mui/material/IconButton';
+import { Meta, StoryFn } from '@storybook/react';
 import i18next from 'i18next';
-import React from 'react';
 import TooltipLight, { TooltipLightProps } from './TooltipLight';
 
 export default {
@@ -10,13 +9,35 @@ export default {
   component: TooltipLight,
 } as Meta;
 
-const Template: Story<TooltipLightProps> = args => <TooltipLight {...args} />;
+const Template: StoryFn<TooltipLightProps> = args => <TooltipLight {...args} />;
 
 export const Add = Template.bind({});
 Add.args = {
   title: 'Add',
   children: (
-    <IconButton aria-label={i18next.t('frequent|Add')}>
+    <IconButton aria-label={i18next.t('translation|Add')}>
+      <Icon color="#adadad" icon="mdi:plus-circle" width="48" />
+    </IconButton>
+  ),
+};
+
+export const Interactive = Template.bind({});
+Interactive.args = {
+  title: 'Add',
+  interactive: true,
+  children: (
+    <IconButton aria-label={i18next.t('translation|Add')}>
+      <Icon color="#adadad" icon="mdi:plus-circle" width="48" />
+    </IconButton>
+  ),
+};
+
+export const NotInteractive = Template.bind({});
+NotInteractive.args = {
+  title: 'Add',
+  interactive: false,
+  children: (
+    <IconButton aria-label={i18next.t('translation|Add')}>
       <Icon color="#adadad" icon="mdi:plus-circle" width="48" />
     </IconButton>
   ),

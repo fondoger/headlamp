@@ -1,12 +1,10 @@
----
-title: "Class: Plugin"
-linkTitle: "Plugin"
-slug: "plugin_lib.Plugin"
----
+[API](../API.md) / [plugin/lib](../modules/plugin_lib.md) / Plugin
+
+# Class: Plugin
 
 [plugin/lib](../modules/plugin_lib.md).Plugin
 
-Plugins should call Headlamp.registerPlugin(pluginId: string, pluginObj: Plugin) to register themselves.
+Plugins may call Headlamp.registerPlugin(pluginId: string, pluginObj: Plugin) to register themselves.
 
 They will have their initialize(register) method called at plugin initialization time.
 
@@ -20,7 +18,7 @@ They will have their initialize(register) method called at plugin initialization
 
 ### initialize
 
-▸ `Abstract` **initialize**(`register`): `boolean`
+▸ `Abstract` **initialize**(`register`): `boolean` \| `void`
 
 initialize is called for each plugin with a Registry which gives the plugin methods for doing things.
 
@@ -34,8 +32,10 @@ initialize is called for each plugin with a Registry which gives the plugin meth
 
 #### Returns
 
-`boolean`
+`boolean` \| `void`
+
+The return code is not used, but used to be required.
 
 #### Defined in
 
-[plugin/lib.ts:94](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/plugin/lib.ts#L94)
+[plugin/lib.ts:49](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/plugin/lib.ts#L49)

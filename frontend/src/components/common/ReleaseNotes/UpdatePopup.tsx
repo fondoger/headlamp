@@ -1,14 +1,155 @@
-import { Button, Snackbar } from '@material-ui/core';
+import { Icon } from '@iconify/react';
+import { Box, Button, Snackbar } from '@mui/material';
+import { styled } from '@mui/system';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-function UpdatePopup(props: { releaseDownloadURL: string }) {
+const ColoredSnackbar = styled(Snackbar)({
+  '& .MuiSnackbarContent-root': {
+    backgroundColor: 'rgb(49, 49, 49)',
+    color: '#fff',
+  },
+});
+
+export interface UpdatePopupProps {
+  /** URL for the release */
+  releaseDownloadURL?: string | null;
+  /** Whether the release is being fetched */
+  fetchingRelease?: boolean;
+  /** If release fetch failed */
+  releaseFetchFailed?: boolean;
+  /** if the user wants to skip a release */
+  skipUpdateHandler: () => void;
+}
+
+function UpdatePopup({
+  releaseDownloadURL,
+  fetchingRelease,
+  releaseFetchFailed,
+  skipUpdateHandler,
+}: UpdatePopupProps) {
   const [show, setShow] = React.useState(true);
-  const { releaseDownloadURL } = props;
-  const { t } = useTranslation('frequent');
+  const { t } = useTranslation();
+  const [closeSnackError, setCloseSnackError] = React.useState(false);
+
+  if (fetchingRelease && !releaseDownloadURL) {
+    return (
+      <ColoredSnackbar
+        sx={{
+          '& .MuiSnackbarContent-root': {
+            backgroundColor: 'rgb(49, 49, 49)',
+            color: '#fff',
+          },
+        }}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        autoHideDuration={5000}
+        message={t('translation|Fetching release information…')}
+        ContentProps={{
+          'aria-describedby': 'updatePopup',
+        }}
+        open={fetchingRelease}
+        action={
+          <React.Fragment>
+            <Button
+              style={{
+                color: 'rgb(255, 242, 0)',
+              }}
+              onClick={() => {
+                skipUpdateHandler();
+              }}
+            >
+              {t('translation|Skip')}
+            </Button>
+          </React.Fragment>
+        }
+      />
+    );
+  }
+
+  if (releaseFetchFailed && !releaseDownloadURL) {
+    return (
+      <ColoredSnackbar
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        open={releaseFetchFailed && !closeSnackError}
+        onClose={() => {
+          setCloseSnackError(true);
+        }}
+        message={t('translation|Failed to fetch release information')}
+        ContentProps={{
+          'aria-describedby': 'updatePopup',
+        }}
+        autoHideDuration={6000}
+      />
+    );
+  }
+
+  if (!releaseDownloadURL) {
+    return null;
+  }
+
+  if (fetchingRelease && !releaseDownloadURL) {
+    return (
+      <ColoredSnackbar
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        autoHideDuration={5000}
+        message={t('translation|Fetching release information…')}
+        ContentProps={{
+          'aria-describedby': 'updatePopup',
+        }}
+        open={fetchingRelease && !closeSnackError}
+        onClose={() => {
+          setCloseSnackError(true);
+        }}
+        action={
+          <React.Fragment>
+            <Button
+              style={{
+                color: 'rgb(255, 242, 0)',
+              }}
+              onClick={() => {
+                skipUpdateHandler();
+              }}
+            >
+              {t('translation|Skip')}
+            </Button>
+          </React.Fragment>
+        }
+      />
+    );
+  }
+
+  if (releaseFetchFailed && !releaseDownloadURL) {
+    return (
+      <ColoredSnackbar
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        open={releaseFetchFailed}
+        message={t('translation|Failed to fetch release information')}
+        ContentProps={{
+          'aria-describedby': 'updatePopup',
+        }}
+        autoHideDuration={6000}
+      />
+    );
+  }
+
+  if (!releaseDownloadURL) {
+    return null;
+  }
 
   return (
-    <Snackbar
+    <ColoredSnackbar
       anchorOrigin={{
         vertical: 'bottom',
         horizontal: 'right',
@@ -18,24 +159,45 @@ function UpdatePopup(props: { releaseDownloadURL: string }) {
       ContentProps={{
         'aria-describedby': 'updatePopup',
       }}
-      message={t('release|An update is available')}
+      message={t('translation|An update is available')}
       action={
         <React.Fragment>
-          <Button color="secondary" onClick={() => window.open(releaseDownloadURL)}>
-            {t('frequent|More')}
-          </Button>
-          <Button
-            color="inherit"
-            onClick={() => {
-              localStorage.setItem('disable_update_check', 'true');
-              setShow(false);
-            }}
-          >
-            {t('Do not notify again')}
-          </Button>
-          <Button color="primary" onClick={() => setShow(false)}>
-            {t('frequent|Close')}
-          </Button>
+          <Box display={'flex'} alignItems="center">
+            <Box ml={-1}>
+              <Button
+                onClick={() => window.open(releaseDownloadURL)}
+                style={{
+                  color: 'inherit',
+                  textTransform: 'none',
+                }}
+              >
+                {t('translation|Read more')}
+              </Button>
+            </Box>
+            <Box mb={0.5}>
+              <Button
+                style={{
+                  color: 'rgb(255, 242, 0)',
+                }}
+                onClick={() => {
+                  localStorage.setItem('disable_update_check', 'true');
+                  setShow(false);
+                }}
+              >
+                <Icon icon={'mdi:bell-off-outline'} width="20" />
+              </Button>
+            </Box>
+            <Box>
+              <Button
+                style={{
+                  color: 'rgb(255, 242, 0)',
+                }}
+                onClick={() => setShow(false)}
+              >
+                {t('translation|Dismiss')}
+              </Button>
+            </Box>
+          </Box>
         </React.Fragment>
       }
     />

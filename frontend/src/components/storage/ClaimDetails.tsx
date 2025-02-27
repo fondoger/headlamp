@@ -1,37 +1,39 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import PersistentVolumeClaim from '../../lib/k8s/persistentVolumeClaim';
-import { StatusLabel } from '../common/Label';
+import { Link } from '../common';
 import { DetailsGrid } from '../common/Resource';
+import { StatusLabelByPhase } from './utils';
 
-export default function VolumeClaimDetails() {
-  const { namespace, name } = useParams<{ namespace: string; name: string }>();
-  const { t } = useTranslation('glossary');
+export function makePVCStatusLabel(item: PersistentVolumeClaim) {
+  const status = item.status!.phase;
+  return StatusLabelByPhase(status!);
+}
 
-  function makeStatusLabel(item: PersistentVolumeClaim) {
-    const status = item.status!.phase;
-    return <StatusLabel status={status === 'Bound' ? 'success' : 'error'}>{status}</StatusLabel>;
-  }
+export default function VolumeClaimDetails(props: { name?: string; namespace?: string }) {
+  const params = useParams<{ namespace: string; name: string }>();
+  const { name = params.name, namespace = params.namespace } = props;
+  const { t } = useTranslation(['glossary', 'translation']);
 
   return (
     <DetailsGrid
       resourceType={PersistentVolumeClaim}
       name={name}
       namespace={namespace}
+      withEvents
       extraInfo={item =>
         item && [
           {
-            name: t('Status'),
-            value: makeStatusLabel(item),
+            name: t('translation|Status'),
+            value: makePVCStatusLabel(item),
           },
           {
             name: t('Capacity'),
-            value: item.spec!.resources.requests.storage,
+            value: item.spec!.resources!.requests.storage,
           },
           {
             name: t('Access Modes'),
-            value: item.spec!.accessModes.join(', '),
+            value: item.spec!.accessModes!.join(', '),
           },
           {
             name: t('Volume Mode'),
@@ -39,7 +41,11 @@ export default function VolumeClaimDetails() {
           },
           {
             name: t('Storage Class'),
-            value: item.spec!.storageClassName,
+            value: (
+              <Link routeName="storageClass" params={{ name: item.spec!.storageClassName }} tooltip>
+                {item.spec!.storageClassName}
+              </Link>
+            ),
           },
         ]
       }

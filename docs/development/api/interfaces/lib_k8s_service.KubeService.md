@@ -1,8 +1,6 @@
----
-title: "Interface: KubeService"
-linkTitle: "KubeService"
-slug: "lib_k8s_service.KubeService"
----
+[API](../API.md) / [lib/k8s/service](../modules/lib_k8s_service.md) / KubeService
+
+# Interface: KubeService
 
 [lib/k8s/service](../modules/lib_k8s_service.md).KubeService
 
@@ -24,7 +22,7 @@ slug: "lib_k8s_service.KubeService"
 
 #### Defined in
 
-[lib/k8s/cluster.ts:23](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L23)
+[lib/k8s/cluster.ts:56](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L56)
 
 ___
 
@@ -32,13 +30,22 @@ ___
 
 • **kind**: `string`
 
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+
+In CamelCase.
+
+Cannot be updated.
+
+**`see`** [more info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds)
+
 #### Inherited from
 
 [KubeObjectInterface](lib_k8s_cluster.KubeObjectInterface.md).[kind](lib_k8s_cluster.KubeObjectInterface.md#kind)
 
 #### Defined in
 
-[lib/k8s/cluster.ts:22](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L22)
+[lib/k8s/cluster.ts:55](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L55)
 
 ___
 
@@ -52,7 +59,7 @@ ___
 
 #### Defined in
 
-[lib/k8s/cluster.ts:24](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L24)
+[lib/k8s/cluster.ts:57](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L57)
 
 ___
 
@@ -69,9 +76,29 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `clusterIP` | `string` |
-| `ports` | { `name`: `string` ; `nodePort`: `number` ; `port`: `number` ; `protocol`: `string` ; `targetPort`: `string` \| `number`  }[] |
+| `externalIPs` | `string`[] |
+| `ports?` | { `name`: `string` ; `nodePort`: `number` ; `port`: `number` ; `protocol`: `string` ; `targetPort`: `string` \| `number`  }[] |
+| `selector` | { `[key: string]`: `string`;  } |
 | `type` | `string` |
 
 #### Defined in
 
-[lib/k8s/service.ts:5](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/service.ts#L5)
+[lib/k8s/service.ts:18](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/service.ts#L18)
+
+___
+
+### status
+
+• **status**: `Object`
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `conditions?` | [`KubeCondition`](lib_k8s_cluster.KubeCondition.md)[] |
+| `loadBalancer?` | { `ingress`: [`KubeLoadBalancerIngress`](lib_k8s_service.KubeLoadBalancerIngress.md)[]  } |
+| `loadBalancer.ingress` | [`KubeLoadBalancerIngress`](lib_k8s_service.KubeLoadBalancerIngress.md)[] |
+
+#### Defined in
+
+[lib/k8s/service.ts:34](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/service.ts#L34)
