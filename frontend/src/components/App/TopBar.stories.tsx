@@ -1,15 +1,30 @@
-import { Meta, Story } from '@storybook/react/types-6-0';
-import React from 'react';
+import { configureStore } from '@reduxjs/toolkit';
+import { Meta, StoryFn } from '@storybook/react';
+import { get } from 'lodash';
+import { PropsWithChildren } from 'react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
-import { createStore } from 'redux';
-import { PureTopBar, PureTopBarProps } from './TopBar';
+import { AppBarActionsProcessor } from '../../redux/actionButtonsSlice';
+import { INITIAL_STATE as UI_INITIAL_STATE } from '../../redux/reducers/ui';
+import { initialState as themeInitialState } from './themeSlice';
+import { processAppBarActions, PureTopBar, PureTopBarProps } from './TopBar';
 
-// eslint-disable-next-line no-unused-vars
-const store = createStore((state = { config: {}, ui: { notifications: [] } }, action) => state, {
-  config: {},
-  ui: {
-    notifications: [],
+const store = configureStore({
+  reducer: (state = { config: {}, ui: typeof UI_INITIAL_STATE }) => state,
+  preloadedState: {
+    config: {},
+    ui: {
+      ...UI_INITIAL_STATE,
+    },
+    notifications: {
+      notifications: [],
+    },
+    plugins: {
+      loaded: true,
+    },
+    theme: {
+      ...themeInitialState,
+    },
   },
 });
 
@@ -30,36 +45,66 @@ export default {
   ],
 } as Meta;
 
-const Template: Story<PureTopBarProps> = args => {
-  return <PureTopBar {...args} />;
-};
+function OurTopBar(args: PropsWithChildren<PureTopBarProps>) {
+  const appBarActions = [{ id: 'moo-thing', action: <p>moo</p> }];
+  const appBarActionsProcessors = [
+    {
+      processor: ({ actions }) => {
+        const newActions = actions.filter(action => action && get(action, 'id') !== 'moo-thing');
+        newActions.push({ action: <p>meow</p>, id: 'meow-thing' });
+        return newActions;
+      },
+      id: 'no-moo-processor',
+    } as AppBarActionsProcessor,
+  ];
 
-export const NoToken = Template.bind({});
-NoToken.args = {
-  appBarActions: {},
+  return (
+    <PureTopBar
+      {...args}
+      appBarActions={processAppBarActions(appBarActions, appBarActionsProcessors)}
+    />
+  );
+}
+
+const Template: StoryFn<PureTopBarProps> = args => {
+  return <OurTopBar {...args} />;
+};
+export const ProcessorAction = Template.bind({});
+ProcessorAction.args = {
   logout: () => {},
   hasToken: false,
 };
 
-export const Token = Template.bind({});
+const PureTemplate: StoryFn<PureTopBarProps> = args => {
+  return <PureTopBar {...args} />;
+};
+
+export const NoToken = PureTemplate.bind({});
+NoToken.args = {
+  appBarActions: [],
+  logout: () => {},
+  hasToken: false,
+};
+
+export const Token = PureTemplate.bind({});
 Token.args = {
-  appBarActions: {},
+  appBarActions: [],
   logout: () => {},
   hasToken: true,
 };
 
-export const OneCluster = Template.bind({});
+export const OneCluster = PureTemplate.bind({});
 OneCluster.args = {
-  appBarActions: {},
+  appBarActions: [],
   logout: () => {},
   hasToken: true,
   cluster: 'ak8s-desktop',
   clusters: { 'ak8s-desktop': '' },
 };
 
-export const TwoCluster = Template.bind({});
+export const TwoCluster = PureTemplate.bind({});
 TwoCluster.args = {
-  appBarActions: {},
+  appBarActions: [],
   logout: () => {},
   hasToken: true,
   cluster: 'ak8s-desktop',

@@ -1,29 +1,29 @@
-import { apiFactoryWithNamespace } from './apiProxy';
-import { KubeObjectInterface, LabelSelector, makeKubeObject } from './cluster';
+import { LabelSelector } from './cluster';
+import { KubeObject, KubeObjectInterface } from './KubeObject';
 
-interface NetworkPolicyPort {
+export interface NetworkPolicyPort {
   port?: string | number;
   protocol?: string;
   endPort?: number;
 }
 
-interface IPBlock {
+export interface IPBlock {
   cidr: string;
-  except: string;
+  except: string[];
 }
 
-interface NetworkPolicyPeer {
+export interface NetworkPolicyPeer {
   ipBlock?: IPBlock;
   namespaceSelector?: LabelSelector;
   podSelector?: LabelSelector;
 }
 
-interface NetworkPolicyEgressRule {
+export interface NetworkPolicyEgressRule {
   ports: NetworkPolicyPort[];
   to: NetworkPolicyPeer[];
 }
 
-interface NetworkPolicyIngressRule {
+export interface NetworkPolicyIngressRule {
   ports: NetworkPolicyPort[];
   from: NetworkPolicyPeer[];
 }
@@ -35,8 +35,58 @@ export interface KubeNetworkPolicy extends KubeObjectInterface {
   policyTypes: string[];
 }
 
-class NetworkPolicy extends makeKubeObject<KubeNetworkPolicy>('NetworkPolicy') {
-  static apiEndpoint = apiFactoryWithNamespace('networking.k8s.io', 'v1', 'networkpolicies');
+class NetworkPolicy extends KubeObject<KubeNetworkPolicy> {
+  static kind = 'NetworkPolicy';
+  static apiName = 'networkpolicies';
+  static apiVersion = 'networking.k8s.io/v1';
+  static isNamespaced = true;
+
+  static getBaseObject(): KubeNetworkPolicy {
+    const baseObject = super.getBaseObject() as KubeNetworkPolicy;
+    baseObject.egress = [
+      {
+        ports: [
+          {
+            port: 80,
+            protocol: 'TCP',
+          },
+        ],
+        to: [
+          {
+            podSelector: {
+              matchLabels: { app: 'headlamp' },
+            },
+          },
+        ],
+      },
+    ];
+    baseObject.ingress = [
+      {
+        ports: [
+          {
+            port: 80,
+            protocol: 'TCP',
+          },
+        ],
+        from: [
+          {
+            podSelector: {
+              matchLabels: { app: 'headlamp' },
+            },
+          },
+        ],
+      },
+    ];
+    baseObject.podSelector = {
+      matchLabels: { app: 'headlamp' },
+    };
+    baseObject.policyTypes = ['Ingress', 'Egress'];
+    return baseObject;
+  }
+
+  static get pluralName() {
+    return 'networkpolicies';
+  }
 }
 
 export default NetworkPolicy;

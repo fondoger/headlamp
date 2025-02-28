@@ -1,6 +1,6 @@
-import { deDE, enUS, esES, hiIN, ptPT } from '@material-ui/core/locale';
-import { createTheme, Theme, ThemeProvider } from '@material-ui/core/styles';
-import React, { useEffect, useState } from 'react';
+import { deDE, enUS, esES, frFR, hiIN, itIT, ptPT } from '@mui/material/locale';
+import { createTheme, StyledEngineProvider, Theme, ThemeProvider } from '@mui/material/styles';
+import React, { ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader } from '../components/common';
 
@@ -12,21 +12,23 @@ function getLocale(locale: string): typeof enUS {
     de: deDE,
     ta: enUS, // @todo: material ui needs a translation for this.
     hi: hiIN,
+    fr: frFR,
+    it: itIT,
   };
-  type LocalesType = 'en' | 'pt' | 'es' | 'ta' | 'de' | 'hi';
+  type LocalesType = 'en' | 'pt' | 'es' | 'ta' | 'de' | 'hi' | 'fr' | 'it';
   return locale in LOCALES ? LOCALES[locale as LocalesType] : LOCALES['en'];
 }
 
 /** Like a ThemeProvider but uses reacti18next for the language selection
  *  Because Material UI is localized as well.
  */
-const ThemeProviderNexti18n: React.FunctionComponent<{ theme: Theme }> = props => {
-  const { i18n, ready: isI18nReady } = useTranslation(
-    ['sidebar', 'frequent', 'glossary', 'auth', 'resource'],
-    {
-      useSuspense: false,
-    }
-  );
+const ThemeProviderNexti18n: React.FunctionComponent<{
+  theme: Theme;
+  children: ReactNode;
+}> = props => {
+  const { i18n, ready: isI18nReady } = useTranslation(['translation', 'glossary'], {
+    useSuspense: false,
+  });
   const [lang, setLang] = useState(i18n.language);
 
   function changeLang(lng: string) {
@@ -39,6 +41,10 @@ const ThemeProviderNexti18n: React.FunctionComponent<{ theme: Theme }> = props =
 
   useEffect(() => {
     i18n.on('languageChanged', changeLang);
+    if (i18n.language) {
+      // Set the lang when the page loads too.
+      changeLang(i18n.language);
+    }
     return () => {
       i18n.off('languageChanged', changeLang);
     };
@@ -48,9 +54,11 @@ const ThemeProviderNexti18n: React.FunctionComponent<{ theme: Theme }> = props =
   const theme = createTheme(props.theme, getLocale(lang));
 
   return (
-    <ThemeProvider theme={theme}>
-      {!!isI18nReady ? props.children : <Loader title="Loading..." />}
-    </ThemeProvider>
+    <StyledEngineProvider injectFirst>
+      <ThemeProvider theme={theme}>
+        {!!isI18nReady ? props.children : <Loader title="Loading..." />}
+      </ThemeProvider>
+    </StyledEngineProvider>
   );
 };
 

@@ -1,5 +1,5 @@
-import { Meta, Story } from '@storybook/react/types-6-0';
-import React from 'react';
+import { Meta, StoryFn } from '@storybook/react';
+import { TestContext } from '../../test';
 import { PureAuthToken, PureAuthTokenProps } from './Auth';
 
 export default {
@@ -11,9 +11,18 @@ export default {
     onChangeToken: { action: 'token changed' },
     onCloseError: { action: 'error closed' },
   },
+  decorators: [
+    Story => {
+      return (
+        <TestContext>
+          <Story />
+        </TestContext>
+      );
+    },
+  ],
 } as Meta;
 
-const Template: Story<PureAuthTokenProps> = args => <PureAuthToken {...args} />;
+const Template: StoryFn<PureAuthTokenProps> = args => <PureAuthToken {...args} />;
 
 export const ShowError = Template.bind({});
 ShowError.args = {

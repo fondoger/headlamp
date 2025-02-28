@@ -1,8 +1,6 @@
----
-title: "Interface: ApiError"
-linkTitle: "ApiError"
-slug: "lib_k8s_apiProxy.ApiError"
----
+[API](../API.md) / [lib/k8s/apiProxy](../modules/lib_k8s_apiProxy.md) / ApiError
+
+# Interface: ApiError
 
 [lib/k8s/apiProxy](../modules/lib_k8s_apiProxy.md).ApiError
 
@@ -20,4 +18,4 @@ slug: "lib_k8s_apiProxy.ApiError"
 
 #### Defined in
 
-[lib/k8s/apiProxy.ts:641](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/apiProxy.ts#L641)
+[lib/k8s/apiProxy.ts:1592](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/apiProxy.ts#L1592)

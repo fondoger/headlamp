@@ -1,39 +1,47 @@
-import Box from '@material-ui/core/Box';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import DetailsViewPluginRenderer from '../../helpers/renderHelpers';
 import ConfigMap from '../../lib/k8s/configMap';
-import Empty from '../common/EmptyContent';
-import Loader from '../common/Loader';
-import { DataField, MainInfoSection, PageGrid } from '../common/Resource';
+import EmptyContent from '../common/EmptyContent';
+import { DataField, DetailsGrid } from '../common/Resource';
 import { SectionBox } from '../common/SectionBox';
+import { NameValueTable, NameValueTableRow } from '../common/SimpleTable';
 
-export default function ConfigDetails() {
-  const { namespace, name } = useParams<{ namespace: string; name: string }>();
-  const [item, setItem] = React.useState<ConfigMap | null>(null);
-  const itemData = item?.data;
-  const { t } = useTranslation(['configmap', 'frequent']);
+export default function ConfigDetails(props: { name?: string; namespace?: string }) {
+  const params = useParams<{ namespace: string; name: string }>();
+  const { name = params.name, namespace = params.namespace } = props;
+  const { t } = useTranslation(['translation']);
 
-  ConfigMap.useApiGet(setItem, name, namespace);
-
-  return !item ? (
-    <Loader title={t('frequent|Loading resource data')} />
-  ) : (
-    <PageGrid>
-      <MainInfoSection resource={item} />
-      <SectionBox title={t('frequent|Data')}>
-        {!itemData ? (
-          <Empty>{t('No data in this config map')}</Empty>
-        ) : (
-          Object.keys(itemData).map((key, i) => (
-            <Box py={2} key={i}>
-              <DataField label={key} value={itemData[key]} />
-            </Box>
-          ))
-        )}
-      </SectionBox>
-      <DetailsViewPluginRenderer resource={item} />
-    </PageGrid>
+  return (
+    <DetailsGrid
+      resourceType={ConfigMap}
+      name={name}
+      namespace={namespace}
+      withEvents
+      extraSections={item =>
+        item && [
+          {
+            id: 'headlamp.configmap-data',
+            section: () => {
+              const itemData = item?.data || [];
+              const mainRows: NameValueTableRow[] = Object.entries(itemData).map(
+                (item: unknown[]) => ({
+                  name: item[0] as string,
+                  value: <DataField label={item[0] as string} disableLabel value={item[1]} />,
+                })
+              );
+              return (
+                <SectionBox title={t('translation|Data')}>
+                  {mainRows.length === 0 ? (
+                    <EmptyContent>{t('No data in this config map')}</EmptyContent>
+                  ) : (
+                    <NameValueTable rows={mainRows} />
+                  )}
+                </SectionBox>
+              );
+            },
+          },
+        ]
+      }
+    />
   );
 }

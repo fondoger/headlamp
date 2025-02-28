@@ -1,5 +1,7 @@
 import { InlineIcon } from '@iconify/react';
-import { Box, Button, withStyles } from '@material-ui/core';
+import { Box, Button } from '@mui/material';
+import { styled } from '@mui/system';
+import _ from 'lodash';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
@@ -9,25 +11,23 @@ import { useClustersConf } from '../../lib/k8s';
 import { testAuth } from '../../lib/k8s/apiProxy';
 import { createRouteURL, getRoute, getRoutePath } from '../../lib/router';
 import { getCluster, getClusterPrefixedPath } from '../../lib/util';
-import { setConfig } from '../../redux/actions/actions';
+import { setConfig } from '../../redux/configSlice';
 import { ClusterDialog } from '../cluster/Chooser';
-import { Loader } from '../common';
+import { Link, Loader } from '../common';
 import { DialogTitle } from '../common/Dialog';
 import Empty from '../common/EmptyContent';
 import OauthPopup from '../oidcauth/OauthPopup';
 
-const ColorButton = withStyles(theme => ({
-  root: {
-    color: theme.palette.primary.contrastText,
-    backgroundColor: theme.palette.sidebarBg,
-    width: '14rem',
-    padding: '0.5rem 2rem',
-    '&:hover': {
-      opacity: '0.8',
-      backgroundColor: theme.palette.sidebarBg,
-    },
+const ColorButton = styled(Button)(({ theme }) => ({
+  color: theme.palette.primary.contrastText,
+  backgroundColor: theme.palette.primaryColor,
+  width: '14rem',
+  padding: '0.5rem 2rem',
+  '&:hover': {
+    opacity: '0.8',
+    backgroundColor: theme.palette.text.primary,
   },
-}))(Button);
+}));
 
 interface ReactRouterLocationStateIface {
   from?: Location;
@@ -42,12 +42,14 @@ function AuthChooser({ children }: AuthChooserProps) {
   const location = useLocation();
   const clusters = useClustersConf();
   const dispatch = useDispatch();
-  const [testingAuth, setTestingAuth] = React.useState(false);
+  const [testingAuth, setTestingAuth] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
   const { from = { pathname: createRouteURL('cluster') } } = (location.state ||
     {}) as ReactRouterLocationStateIface;
   const clusterName = getCluster() as string;
-  const { t } = useTranslation('auth');
+  const { t } = useTranslation();
+  const clustersRef = React.useRef<typeof clusters>(null);
+  const cancelledRef = React.useRef(false);
 
   let clusterAuthType = '';
   if (clusters && clusters[clusterName]) {
@@ -56,10 +58,24 @@ function AuthChooser({ children }: AuthChooserProps) {
 
   const numClusters = Object.keys(clusters || {}).length;
 
+  function runTestAuthAgain() {
+    setError(null);
+    clustersRef.current = null;
+  }
+
   React.useEffect(
     () => {
+      const sameClusters = _.isEqual(clustersRef.current, clusters);
+      if (!sameClusters) {
+        clustersRef.current = clusters;
+      }
       const clusterName = getCluster();
-      if (!clusterName || !clusters || error || numClusters === 0) {
+
+      // Reset the testing auth state just to prevent the early return from this function
+      // without actually testing auth, which would cause the auth chooser to never show up.
+      setTestingAuth(false);
+
+      if (!clusterName || !clusters || sameClusters || error || numClusters === 0) {
         return;
       }
 
@@ -67,8 +83,6 @@ function AuthChooser({ children }: AuthChooserProps) {
       if (!cluster) {
         return;
       }
-
-      let cancelled = false;
 
       // If we haven't yet figured whether we need to use a token for the current
       //   cluster, then we check here.
@@ -80,16 +94,17 @@ function AuthChooser({ children }: AuthChooserProps) {
         setTestingAuth(true);
 
         let errorObj: Error | null = null;
-        setError(errorObj);
 
-        testAuth()
+        console.debug('Testing auth at authchooser');
+
+        testAuth(clusterName)
           .then(() => {
             console.debug('Not requiring token as testing auth succeeded');
             useToken = false;
           })
           .catch(err => {
-            if (!cancelled) {
-              console.debug('Requiring token as testing auth failed:', err);
+            if (!cancelledRef.current) {
+              console.debug(`Requiring token for ${clusterName} as testing auth failed:`, err);
 
               // Ideally we'd only not assign the error if it was 401 or 403 (so we let the logic
               // proceed to request a token), but let's first check whether this is all we get
@@ -102,13 +117,17 @@ function AuthChooser({ children }: AuthChooserProps) {
             }
           })
           .finally(() => {
-            if (!cancelled) {
-              cancelled = true;
+            if (!cancelledRef.current) {
               setTestingAuth(false);
 
               if (!!errorObj) {
-                setError(errorObj);
+                if (!_.isEqual(errorObj, error)) {
+                  setError(errorObj);
+                }
+
                 return;
+              } else {
+                setError(null);
               }
 
               cluster.useToken = useToken;
@@ -140,17 +159,22 @@ function AuthChooser({ children }: AuthChooserProps) {
           }),
         });
       }
-
-      return function cleanup() {
-        cancelled = true;
-      };
     },
     // eslint-disable-next-line
     [clusters, error]
   );
 
+  // Ensure we have a way to know in the testAuth result whether this component is no longer
+  // mounted.
+  React.useEffect(() => {
+    return function cleanup() {
+      cancelledRef.current = true;
+    };
+  }, []);
+
   return (
     <PureAuthChooser
+      clusterName={clusterName}
       testingTitle={
         numClusters > 1
           ? t('Getting auth info: {{ clusterName }}', { clusterName })
@@ -162,11 +186,10 @@ function AuthChooser({ children }: AuthChooserProps) {
           ? t('Authentication: {{ clusterName }}', { clusterName })
           : t('Authentication')
       }
-      haveClusters={!!clusters && Object.keys(clusters).length > 1}
       error={error}
       oauthUrl={`${helpers.getAppUrl()}oidc?dt=${Date()}&cluster=${getCluster()}`}
       clusterAuthType={clusterAuthType}
-      handleTryAgain={() => setError(null)}
+      handleTryAgain={runTestAuthAgain}
       handleOidcAuth={() => {
         history.replace({
           pathname: generatePath(getClusterPrefixedPath(), {
@@ -175,7 +198,7 @@ function AuthChooser({ children }: AuthChooserProps) {
         });
       }}
       handleBackButtonPress={() => {
-        history.goBack();
+        numClusters > 1 ? history.goBack() : history.push('/');
       }}
       handleTokenAuth={() => {
         history.push({
@@ -197,12 +220,12 @@ export interface PureAuthChooserProps {
   error: Error | null;
   oauthUrl: string;
   clusterAuthType: string;
-  haveClusters: boolean;
   handleOidcAuth: () => void;
   handleTokenAuth: () => void;
   handleTryAgain: () => void;
   handleBackButtonPress: () => void;
   children?: React.ReactNode;
+  clusterName: string;
 }
 
 export function PureAuthChooser({
@@ -212,14 +235,14 @@ export function PureAuthChooser({
   error,
   oauthUrl,
   clusterAuthType,
-  haveClusters,
   handleOidcAuth,
   handleTokenAuth,
   handleTryAgain,
   handleBackButtonPress,
   children,
+  clusterName,
 }: PureAuthChooserProps) {
-  const { t } = useTranslation('auth');
+  const { t } = useTranslation();
 
   function onClose() {
     // Do nothing because we're not supposed to close on backdrop click or escape.
@@ -256,40 +279,51 @@ export function PureAuthChooser({
               <Box m={2}>
                 <ColorButton onClick={handleTokenAuth}>{t('Use A Token')}</ColorButton>
               </Box>
+              <Box m={2} textAlign="center">
+                <Link routeName="settingsCluster" params={{ clusterID: clusterName }}>
+                  {t('translation|Cluster settings')}
+                </Link>
+              </Box>
             </Box>
           ) : (
             <Box alignItems="center" textAlign="center">
               <Box m={2}>
                 <Empty>
-                  {t('Failed to get authentication information: {{ errorMessage }}', {
-                    errorMessage: error!.message,
-                  })}
+                  {error && error.message === 'Bad Gateway'
+                    ? t(
+                        'Failed to connect. Please make sure the Kubernetes cluster is running and accessible. Error: {{ errorMessage }}',
+                        { errorMessage: error!.message }
+                      )
+                    : t('Failed to get authentication information: {{ errorMessage }}', {
+                        errorMessage: error!.message,
+                      })}
                 </Empty>
+                <Link routeName="settingsClusterHomeContext">
+                  {t('translation|Cluster settings')}
+                </Link>
               </Box>
-              <ColorButton onClick={handleTryAgain}>{t('frequent|Try Again')}</ColorButton>
+              <ColorButton onClick={handleTryAgain}>{t('translation|Try Again')}</ColorButton>
             </Box>
           )}
         </Box>
       )}
-      {haveClusters && (
-        <Box display="flex" flexDirection="column" alignItems="center">
-          <Box
-            m={2}
-            display="flex"
-            alignItems="center"
-            style={{ cursor: 'pointer' }}
-            onClick={handleBackButtonPress}
-            role="button"
-          >
-            <Box pt={0.5}>
-              <InlineIcon icon="mdi:chevron-left" height={20} width={20} />
-            </Box>
-            <Box fontSize={14} style={{ textTransform: 'uppercase' }}>
-              {t('frequent|Back')}
-            </Box>
+      <Box display="flex" flexDirection="column" alignItems="center">
+        <Box
+          m={2}
+          display="flex"
+          alignItems="center"
+          style={{ cursor: 'pointer' }}
+          onClick={handleBackButtonPress}
+          role="button"
+        >
+          <Box pt={0.5}>
+            <InlineIcon icon="mdi:chevron-left" height={20} width={20} />
+          </Box>
+          <Box fontSize={14} style={{ textTransform: 'uppercase' }}>
+            {t('translation|Back')}
           </Box>
         </Box>
-      )}
+      </Box>
       {children}
     </ClusterDialog>
   );

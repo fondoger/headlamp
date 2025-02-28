@@ -1,35 +1,14 @@
+import './index.css';
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import App from './App';
-import * as serviceWorker from './serviceWorker';
 
-ReactDOM.render(<App />, document.getElementById('root'));
+const container = document.getElementById('root');
+const root = createRoot(container!);
+root.render(<App />);
 
-if (process.env.NODE_ENV !== 'production') {
-  const axe = require('@axe-core/react');
-  const axeCore = require('axe-core');
-
-  if (process.env.REACT_APP_SKIP_A11Y !== 'true') {
-    axe(React, ReactDOM, 500, undefined, undefined, (results: typeof axeCore.AxeResults) => {
-      if (results.violations.length > 0) {
-        console.error('axe results', results);
-        alert(
-          'Accessibility issues found. See developer console. ' +
-            '`REACT_APP_SKIP_A11Y=true make run-frontend` to disable alert.'
-        );
-      }
-    }).then(() => {
-      // Show the logs at end of other console logs (and after the alert).
-      // So they are easier to read.
-      axe(React, ReactDOM, 500, { disableDeduplicate: true });
-    });
-  } else {
-    // Only show the logs.
-    axe(React, ReactDOM, 500);
-  }
-}
-
-// If you want your app to work offline and load faster, you can change
-// unregister() to register() below. Note this comes with some pitfalls.
-// Learn more about service workers: https://bit.ly/CRA-PWA
-serviceWorker.unregister();
+/**
+ * We used to have axe a11y check here
+ * TODO: Integrate a11y check in e2e tests
+ * https://playwright.dev/docs/accessibility-testing
+ */

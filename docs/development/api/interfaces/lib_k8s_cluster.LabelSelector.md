@@ -1,8 +1,6 @@
----
-title: "Interface: LabelSelector"
-linkTitle: "LabelSelector"
-slug: "lib_k8s_cluster.LabelSelector"
----
+[API](../API.md) / [lib/k8s/cluster](../modules/lib_k8s_cluster.md) / LabelSelector
+
+# Interface: LabelSelector
 
 [lib/k8s/cluster](../modules/lib_k8s_cluster.md).LabelSelector
 
@@ -10,19 +8,11 @@ slug: "lib_k8s_cluster.LabelSelector"
 
 ### matchExpressions
 
-• `Optional` **matchExpressions**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `key` | `string` |
-| `operator` | `string` |
-| `values` | `string`[] |
+• `Optional` **matchExpressions**: { `key`: `string` ; `operator`: `string` ; `values`: `string`[]  }[]
 
 #### Defined in
 
-[lib/k8s/cluster.ts:454](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L454)
+[lib/k8s/cluster.ts:1230](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L1230)
 
 ___
 
@@ -36,4 +26,4 @@ ___
 
 #### Defined in
 
-[lib/k8s/cluster.ts:459](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L459)
+[lib/k8s/cluster.ts:1235](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L1235)
