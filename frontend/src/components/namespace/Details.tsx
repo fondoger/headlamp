@@ -1,14 +1,18 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import DetailsViewPluginRenderer from '../../helpers/renderHelpers';
-import Namespace from '../../lib/k8s/namespace';
+import { LimitRange } from '../../lib/k8s/limitRange';
+import Namespace, { KubeNamespace } from '../../lib/k8s/namespace';
+import ResourceQuota from '../../lib/k8s/resourceQuota';
 import { StatusLabel } from '../common/Label';
 import { ConditionsSection, DetailsGrid, OwnedPodsSection } from '../common/Resource';
+import DetailsViewSection from '../DetailsViewSection';
+import { LimitRangeRenderer } from '../limitRange/List';
+import { ResourceQuotaRenderer } from '../resourceQuota/List';
 
-export default function NamespaceDetails() {
-  const { name } = useParams<{ name: string }>();
-  const { t } = useTranslation('glossary');
+export default function NamespaceDetails(props: { name?: string }) {
+  const params = useParams<{ name: string }>();
+  const { name = params.name } = props;
+  const { t } = useTranslation(['glossary', 'translation']);
 
   function makeStatusLabel(namespace: Namespace | null) {
     const status = namespace?.status.phase;
@@ -19,23 +23,83 @@ export default function NamespaceDetails() {
     <DetailsGrid
       resourceType={Namespace}
       name={name}
+      withEvents
       extraInfo={item =>
         item && [
           {
-            name: t('Status'),
+            name: t('translation|Status'),
             value: makeStatusLabel(item),
           },
         ]
       }
-      sectionsFunc={item =>
-        item && (
-          <>
-            {item.status?.conditions && <ConditionsSection resource={item} />}
-            <OwnedPodsSection hideColumns={['namespace']} resource={item?.jsonData} />
-            <DetailsViewPluginRenderer resource={item} />
-          </>
-        )
+      extraSections={item =>
+        item && [
+          {
+            id: 'headlamp.namespace-conditions',
+            section: item?.status?.conditions && <ConditionsSection resource={item} />,
+          },
+          {
+            id: 'headlamp.namespace-owned-resourcequotas',
+            section: <NamespacedResourceQuotasSection resource={item?.jsonData} />,
+          },
+          {
+            id: 'headlamp.namespace-owned-limitranges',
+            section: <NamespacedLimitRangesSection resource={item?.jsonData} />,
+          },
+          {
+            id: 'headlamp.namespace-owned-pods',
+            section: (
+              <OwnedPodsSection hideColumns={['namespace']} resource={item?.jsonData} noSearch />
+            ),
+          },
+          {
+            id: 'headlamp.namespace-details-view',
+            section: <DetailsViewSection resource={item} />,
+          },
+        ]
       }
+    />
+  );
+}
+
+export interface NamespacedLimitRangesSectionProps {
+  resource: KubeNamespace;
+}
+
+export function NamespacedLimitRangesSection(props: NamespacedLimitRangesSectionProps) {
+  const { resource } = props;
+
+  const { items: limitRanges, errors } = LimitRange.useList({
+    namespace: resource.metadata.name,
+  });
+
+  return (
+    <LimitRangeRenderer
+      hideColumns={['namespace']}
+      limitRanges={limitRanges}
+      errors={errors}
+      noNamespaceFilter
+    />
+  );
+}
+
+export interface NamespacedResourceQuotasSectionProps {
+  resource: KubeNamespace;
+}
+
+export function NamespacedResourceQuotasSection(props: NamespacedResourceQuotasSectionProps) {
+  const { resource } = props;
+
+  const { items: resourceQuotas, errors } = ResourceQuota.useList({
+    namespace: resource.metadata.name,
+  });
+
+  return (
+    <ResourceQuotaRenderer
+      hideColumns={['namespace']}
+      resourceQuotas={resourceQuotas}
+      errors={errors}
+      noNamespaceFilter
     />
   );
 }

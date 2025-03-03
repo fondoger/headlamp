@@ -1,13 +1,27 @@
-import { Meta, Story } from '@storybook/react/types-6-0';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormGroup from '@mui/material/FormGroup';
+import Switch from '@mui/material/Switch';
+import { Meta, StoryFn } from '@storybook/react';
+import { Provider } from 'react-redux';
+import store from '../../../redux/stores/store';
 import { EditorDialog, EditorDialogProps } from '..';
 
 export default {
   title: 'Resource/EditorDialog',
   component: EditorDialog,
   argTypes: {},
+  decorators: [
+    Story => {
+      return (
+        <Provider store={store}>
+          <Story />
+        </Provider>
+      );
+    },
+  ],
 } as Meta;
 
-const Template: Story<EditorDialogProps> = args => {
+const Template: StoryFn<EditorDialogProps> = args => {
   return (
     <EditorDialog
       {...args}
@@ -26,3 +40,24 @@ const Template: Story<EditorDialogProps> = args => {
 };
 
 export const EditorDialogWithResource = Template.bind({});
+EditorDialogWithResource.args = {
+  open: true,
+};
+
+export const EditorDialogWithResourceClosed = Template.bind({});
+EditorDialogWithResourceClosed.args = {
+  open: false,
+};
+
+export const ExtraActions = Template.bind({});
+ExtraActions.args = {
+  open: true,
+  actions: [
+    <FormGroup row>
+      <FormControlLabel
+        control={<Switch checked onChange={() => {}} />}
+        label="Extra Action Switch"
+      />
+    </FormGroup>,
+  ],
+};

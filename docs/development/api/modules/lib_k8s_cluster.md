@@ -1,8 +1,6 @@
----
-title: "Module: lib/k8s/cluster"
-linkTitle: "lib/k8s/cluster"
-slug: "lib_k8s_cluster"
----
+[API](../API.md) / lib/k8s/cluster
+
+# Module: lib/k8s/cluster
 
 ## References
 
@@ -12,9 +10,33 @@ Re-exports [ApiListOptions](../interfaces/lib_k8s_cluster.ApiListOptions.md)
 
 ___
 
+### ApiListSingleNamespaceOptions
+
+Re-exports [ApiListSingleNamespaceOptions](../interfaces/lib_k8s_cluster.ApiListSingleNamespaceOptions.md)
+
+___
+
+### AuthRequestResourceAttrs
+
+Re-exports [AuthRequestResourceAttrs](../interfaces/lib_k8s_cluster.AuthRequestResourceAttrs.md)
+
+___
+
 ### Cluster
 
 Re-exports [Cluster](../interfaces/lib_k8s_cluster.Cluster.md)
+
+___
+
+### ContainerState
+
+Re-exports [ContainerState](../interfaces/lib_k8s_cluster.ContainerState.md)
+
+___
+
+### HEADLAMP\_ALLOWED\_NAMESPACES
+
+Re-exports [HEADLAMP_ALLOWED_NAMESPACES](lib_k8s_cluster.md#headlamp_allowed_namespaces)
 
 ___
 
@@ -39,6 +61,18 @@ ___
 ### KubeContainerStatus
 
 Re-exports [KubeContainerStatus](../interfaces/lib_k8s_cluster.KubeContainerStatus.md)
+
+___
+
+### KubeManagedFields
+
+Re-exports [KubeManagedFields](../interfaces/lib_k8s_cluster.KubeManagedFields.md)
+
+___
+
+### KubeManagedFieldsEntry
+
+Re-exports [KubeManagedFieldsEntry](../interfaces/lib_k8s_cluster.KubeManagedFieldsEntry.md)
 
 ___
 
@@ -93,6 +127,12 @@ ___
 ### StringDict
 
 Re-exports [StringDict](../interfaces/lib_k8s_cluster.StringDict.md)
+
+___
+
+### Time
+
+Re-exports [Time](lib_k8s_cluster.md#time)
 
 ___
 

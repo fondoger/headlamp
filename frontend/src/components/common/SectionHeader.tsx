@@ -1,37 +1,22 @@
-import Grid from '@material-ui/core/Grid';
-import { makeStyles } from '@material-ui/core/styles';
-import { Variant } from '@material-ui/core/styles/createTypography';
-import Typography from '@material-ui/core/Typography';
+import { Box } from '@mui/material';
+import Grid from '@mui/material/Grid';
+import { Variant } from '@mui/material/styles/createTypography';
+import Typography from '@mui/material/Typography';
 import React from 'react';
 
-type HeaderStyle = 'main' | 'subsection' | 'normal' | 'label';
-
-export interface HeaderStyleProps {
-  noPadding?: boolean;
-  headerStyle?: HeaderStyle;
-}
-
-const useStyles = makeStyles(theme => ({
-  sectionHeader: ({ noPadding }: HeaderStyleProps) => ({
-    padding: theme.spacing(noPadding ? 0 : 2),
-    paddingTop: theme.spacing(noPadding ? 0 : 3),
-    paddingRight: '0',
-  }),
-  sectionTitle: ({ headerStyle }: HeaderStyleProps) => ({
-    ...theme.palette.headerStyle[headerStyle || 'normal'],
-  }),
-}));
+export type HeaderStyle = 'main' | 'subsection' | 'normal' | 'label';
 
 export interface SectionHeaderProps {
   title: string;
+  subtitle?: string | React.ReactNode;
   actions?: React.ReactNode[] | null;
   noPadding?: boolean;
   headerStyle?: HeaderStyle;
+  titleSideActions?: React.ReactNode[];
 }
 
 export default function SectionHeader(props: SectionHeaderProps) {
-  const { noPadding = false, headerStyle = 'main' } = props;
-  const classes = useStyles({ noPadding, headerStyle });
+  const { noPadding = false, headerStyle = 'main', titleSideActions = [] } = props;
   const actions = props.actions || [];
   const titleVariants: { [key: string]: Variant } = {
     main: 'h1',
@@ -45,19 +30,50 @@ export default function SectionHeader(props: SectionHeaderProps) {
       container
       alignItems="center"
       justifyContent="space-between"
-      className={classes.sectionHeader}
+      sx={theme => ({
+        padding: theme.spacing(noPadding ? 0 : 2),
+        paddingTop: theme.spacing(noPadding ? 0 : 3),
+        paddingRight: '0',
+      })}
       spacing={2}
     >
-      {props.title && (
-        <Grid item>
-          <Typography variant={titleVariants[headerStyle]} noWrap className={classes.sectionTitle}>
-            {props.title}
+      <Grid item>
+        {(!!props.title || titleSideActions.length > 0) && (
+          <Box display="flex" alignItems="center">
+            {!!props.title && (
+              <Typography
+                variant={titleVariants[headerStyle]}
+                noWrap
+                sx={theme => ({
+                  ...theme.palette.headerStyle[headerStyle || 'normal'],
+                  whiteSpace: 'pre-wrap',
+                })}
+              >
+                {props.title}
+              </Typography>
+            )}
+            {!!titleSideActions && (
+              <Box ml={1} justifyContent="center">
+                {titleSideActions}
+              </Box>
+            )}
+          </Box>
+        )}
+        {!!props.subtitle && (
+          <Typography variant="h6" component="p" sx={{ fontStyle: 'italic' }}>
+            {props.subtitle}
           </Typography>
-        </Grid>
-      )}
+        )}
+      </Grid>
       {actions.length > 0 && (
         <Grid item>
-          <Grid item container alignItems="center" justifyContent="flex-end">
+          <Grid
+            item
+            container
+            alignItems="center"
+            justifyContent="flex-end"
+            sx={{ minHeight: '40px' }}
+          >
             {actions.map((action, i) => (
               <Grid item key={i}>
                 {action}

@@ -4,14 +4,16 @@ import { useParams } from 'react-router-dom';
 import StorageClass from '../../lib/k8s/storageClass';
 import { DetailsGrid } from '../common/Resource';
 
-export default function StorageClassDetails() {
-  const { name } = useParams<{ name: string }>();
+export default function StorageClassDetails(props: { name?: string }) {
+  const params = useParams<{ name: string }>();
+  const { name = params.name } = props;
   const { t } = useTranslation('glossary');
 
   return (
     <DetailsGrid
       resourceType={StorageClass}
       name={name}
+      withEvents
       extraInfo={item =>
         item && [
           {

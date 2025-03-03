@@ -1,8 +1,6 @@
----
-title: "Module: lib/k8s/service"
-linkTitle: "lib/k8s/service"
-slug: "lib_k8s_service"
----
+[API](../API.md) / lib/k8s/service
+
+# Module: lib/k8s/service
 
 ## Classes
 
@@ -10,4 +8,6 @@ slug: "lib_k8s_service"
 
 ## Interfaces
 
+- [KubeLoadBalancerIngress](../interfaces/lib_k8s_service.KubeLoadBalancerIngress.md)
+- [KubePortStatus](../interfaces/lib_k8s_service.KubePortStatus.md)
 - [KubeService](../interfaces/lib_k8s_service.KubeService.md)

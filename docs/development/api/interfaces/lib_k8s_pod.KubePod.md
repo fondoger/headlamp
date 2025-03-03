@@ -1,8 +1,6 @@
----
-title: "Interface: KubePod"
-linkTitle: "KubePod"
-slug: "lib_k8s_pod.KubePod"
----
+[API](../API.md) / [lib/k8s/pod](../modules/lib_k8s_pod.md) / KubePod
+
+# Interface: KubePod
 
 [lib/k8s/pod](../modules/lib_k8s_pod.md).KubePod
 
@@ -24,7 +22,7 @@ slug: "lib_k8s_pod.KubePod"
 
 #### Defined in
 
-[lib/k8s/cluster.ts:23](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L23)
+[lib/k8s/cluster.ts:56](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L56)
 
 ___
 
@@ -32,13 +30,22 @@ ___
 
 • **kind**: `string`
 
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+
+In CamelCase.
+
+Cannot be updated.
+
+**`see`** [more info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds)
+
 #### Inherited from
 
 [KubeObjectInterface](lib_k8s_cluster.KubeObjectInterface.md).[kind](lib_k8s_cluster.KubeObjectInterface.md#kind)
 
 #### Defined in
 
-[lib/k8s/cluster.ts:22](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L22)
+[lib/k8s/cluster.ts:55](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L55)
 
 ___
 
@@ -52,24 +59,17 @@ ___
 
 #### Defined in
 
-[lib/k8s/cluster.ts:24](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L24)
+[lib/k8s/cluster.ts:57](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L57)
 
 ___
 
 ### spec
 
-• **spec**: `Object`
-
-#### Type declaration
-
-| Name | Type |
-| :------ | :------ |
-| `containers` | [`KubeContainer`](lib_k8s_cluster.KubeContainer.md)[] |
-| `nodeName` | `string` |
+• **spec**: [`KubePodSpec`](lib_k8s_pod.KubePodSpec.md)
 
 #### Defined in
 
-[lib/k8s/pod.ts:12](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/pod.ts#L12)
+[lib/k8s/pod.ts:32](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L32)
 
 ___
 
@@ -87,13 +87,15 @@ ___
 | :------ | :------ |
 | `conditions` | [`KubeCondition`](lib_k8s_cluster.KubeCondition.md)[] |
 | `containerStatuses` | [`KubeContainerStatus`](lib_k8s_cluster.KubeContainerStatus.md)[] |
-| `hostIP` | `string` |
-| `message` | `string` |
+| `ephemeralContainerStatuses?` | [`KubeContainerStatus`](lib_k8s_cluster.KubeContainerStatus.md)[] |
+| `hostIP?` | `string` |
+| `initContainerStatuses?` | [`KubeContainerStatus`](lib_k8s_cluster.KubeContainerStatus.md)[] |
+| `message?` | `string` |
 | `phase` | `string` |
-| `qosClass` | `string` |
-| `reason` | `string` |
-| `startTime` | `number` |
+| `qosClass?` | `string` |
+| `reason?` | `string` |
+| `startTime` | [`Time`](../modules/lib_k8s_cluster.md#time) |
 
 #### Defined in
 
-[lib/k8s/pod.ts:16](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/pod.ts#L16)
+[lib/k8s/pod.ts:33](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/pod.ts#L33)

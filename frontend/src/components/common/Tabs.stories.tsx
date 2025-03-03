@@ -1,4 +1,4 @@
-import { Meta, Story } from '@storybook/react/types-6-0';
+import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
 import Tabs, { TabsProps } from './Tabs';
 
@@ -8,7 +8,7 @@ export default {
   argTypes: { onTabChanged: { action: 'tab changed' } },
 } as Meta;
 
-const Template: Story<TabsProps> = args => <Tabs {...args} />;
+const Template: StoryFn<TabsProps> = args => <Tabs {...args} />;
 
 export const BasicTabs = Template.bind({});
 BasicTabs.args = {
@@ -22,6 +22,7 @@ BasicTabs.args = {
       component: <p>tab body 2</p>,
     },
   ],
+  ariaLabel: 'Basic Tabs',
 };
 
 export const StartingTab = Template.bind({});
@@ -37,4 +38,5 @@ StartingTab.args = {
       component: <p>We start on the second tab using defaultIndex=1</p>,
     },
   ],
+  ariaLabel: 'Starting Tabs',
 };

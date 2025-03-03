@@ -1,16 +1,22 @@
 import cronstrue from 'cronstrue/i18n';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import CronJob from '../../lib/k8s/cronJob';
-import { useFilterFunc } from '../../lib/util';
-import { DateLabel, HoverInfoLabel, Link } from '../common';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import { DateLabel, HoverInfoLabel, LightTooltip } from '../common';
+import ResourceListView from '../common/Resource/ResourceListView';
 
 export function getSchedule(cronJob: CronJob, locale: string) {
   const { schedule } = cronJob.spec;
-  const described = schedule.startsWith('@') ? '' : cronstrue.toString(schedule, { locale });
+  let described = '';
+  if (!schedule.startsWith('@')) {
+    try {
+      described = cronstrue.toString(schedule, { locale });
+    } catch (e) {
+      console.debug(
+        `Could not describe cron "${schedule}" for cronJob ${cronJob.metadata.namespace}/${cronJob.metadata.name}:`,
+        e
+      );
+    }
+  }
   return <HoverInfoLabel label={schedule} hoverInfo={described} />;
 }
 
@@ -19,61 +25,84 @@ export function getLastScheduleTime(cronJob: CronJob) {
   if (!lastScheduleTime) {
     return '';
   }
-  return <DateLabel date={lastScheduleTime} />;
+  return <DateLabel date={lastScheduleTime} format="mini" />;
 }
 
 export default function CronJobList() {
-  const [cronJobs, error] = CronJob.useList();
-  const filterFunc = useFilterFunc();
-  const { t, i18n } = useTranslation('glossary');
+  const { t, i18n } = useTranslation(['glossary', 'translation']);
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Cron Jobs')} />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={CronJob.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: cronJob => <Link kubeObject={cronJob} />,
-            sort: (c1: CronJob, c2: CronJob) => {
-              if (c1.metadata.name < c2.metadata.name) {
-                return -1;
-              } else if (c1.metadata.name > c2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
+    <ResourceListView
+      title={t('Cron Jobs')}
+      resourceClass={CronJob}
+      columns={[
+        'name',
+        'namespace',
+        'cluster',
+        {
+          id: 'schedule',
+          label: t('Schedule'),
+          getValue: cronJob => cronJob.spec.schedule,
+          render: cronJob => getSchedule(cronJob, i18n.language),
+        },
+        {
+          id: 'suspend',
+          label: t('translation|Suspend'),
+          getValue: cronJob => cronJob.spec.suspend.toString(),
+          gridTemplate: 0.6,
+        },
+        {
+          id: 'active',
+          label: t('translation|Active'),
+          getValue: cronJob => cronJob.status?.active?.length || 0,
+          gridTemplate: 0.6,
+        },
+        {
+          id: 'lastScheduleTime',
+          label: t('Last Schedule'),
+          getValue: cronJob => cronJob.status.lastScheduletime ?? '',
+          render: cronJob => getLastScheduleTime(cronJob),
+        },
+        {
+          id: 'containers',
+          label: t('Containers'),
+          getValue: deployment =>
+            deployment
+              .getContainers()
+              .map(c => c.name)
+              .join(', '),
+          render: deployment => {
+            const containers = deployment.getContainers().map(c => c.name);
+            const containerText = containers.join(', ');
+            const containerTooltip = containers.join('\n');
+            return (
+              <LightTooltip title={containerTooltip} interactive>
+                {containerText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('glossary|Namespace'),
-            getter: cronJob => cronJob.getNamespace(),
-            sort: true,
+        },
+        {
+          id: 'images',
+          label: t('Images'),
+          getValue: deployment =>
+            deployment
+              .getContainers()
+              .map(c => c.image)
+              .join(', '),
+          render: deployment => {
+            const images = deployment.getContainers().map(c => c.image);
+            const imageText = images.join(', ');
+            const imageTooltip = images.join('\n');
+            return (
+              <LightTooltip title={imageTooltip} interactive>
+                {imageText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('Schedule'),
-            getter: cronJob => getSchedule(cronJob, i18n.language),
-          },
-          {
-            label: t('Suspend'),
-            getter: cronJob => cronJob.spec.suspend.toString(),
-          },
-          {
-            label: t('Last Schedule'),
-            getter: cronJob => getLastScheduleTime(cronJob),
-          },
-          {
-            label: t('frequent|Age'),
-            getter: cronJob => cronJob.getAge(),
-            sort: (c1: CronJob, c2: CronJob) =>
-              new Date(c2.metadata.creationTimestamp).getTime() -
-              new Date(c1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={cronJobs}
-        defaultSortingColumn={6}
-      />
-    </SectionBox>
+        },
+        'age',
+      ]}
+    />
   );
 }
