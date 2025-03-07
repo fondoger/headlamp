@@ -1,8 +1,6 @@
----
-title: "Module: lib/router"
-linkTitle: "lib/router"
-slug: "lib_router"
----
+[API](../API.md) / lib/router
+
+# Module: lib/router
 
 ## Interfaces
 
@@ -28,7 +26,7 @@ slug: "lib_router"
 
 #### Defined in
 
-[lib/router.tsx:428](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/router.tsx#L428)
+[lib/router.tsx:761](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/router.tsx#L761)
 
 ## Functions
 
@@ -49,7 +47,7 @@ slug: "lib_router"
 
 #### Defined in
 
-[lib/router.tsx:457](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/router.tsx#L457)
+[lib/router.tsx:819](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/router.tsx#L819)
 
 ___
 
@@ -63,7 +61,7 @@ ___
 
 #### Defined in
 
-[lib/router.tsx:487](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/router.tsx#L487)
+[lib/router.tsx:847](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/router.tsx#L847)
 
 ___
 
@@ -83,7 +81,7 @@ ___
 
 #### Defined in
 
-[lib/router.tsx:437](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/router.tsx#L437)
+[lib/router.tsx:770](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/router.tsx#L770)
 
 ___
 
@@ -103,4 +101,29 @@ ___
 
 #### Defined in
 
-[lib/router.tsx:441](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/router.tsx#L441)
+[lib/router.tsx:803](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/router.tsx#L803)
+
+___
+
+### getRouteUseClusterURL
+
+▸ **getRouteUseClusterURL**(`route`): `boolean`
+
+Should the route use a cluster URL?
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `route` | [`Route`](../interfaces/lib_router.Route.md) |
+
+#### Returns
+
+`boolean`
+
+true when a cluster URL contains cluster in the URL. eg. /c/minikube/my-url
+  false, the URL does not contain the cluster. eg. /my-url
+
+#### Defined in
+
+[lib/router.tsx:791](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/router.tsx#L791)

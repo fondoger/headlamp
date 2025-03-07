@@ -1,14 +1,27 @@
----
-title: "Module: lib/util"
-linkTitle: "lib/util"
-slug: "lib_util"
----
+[API](../API.md) / lib/util
+
+# Module: lib/util
+
+## Namespaces
+
+- [auth](lib_util.auth.md)
+- [units](lib_util.units.md)
 
 ## Interfaces
 
-- [FilterState](../interfaces/lib_util.FilterState.md)
+- [TimeAgoOptions](../interfaces/lib_util.TimeAgoOptions.md)
 
 ## Type aliases
+
+### DateFormatOptions
+
+Ƭ **DateFormatOptions**: ``"brief"`` \| ``"mini"``
+
+#### Defined in
+
+[lib/util.ts:33](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L33)
+
+___
 
 ### DateParam
 
@@ -16,7 +29,7 @@ slug: "lib_util"
 
 #### Defined in
 
-[lib/util.ts:20](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L20)
+[lib/util.ts:31](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L31)
 
 ## Variables
 
@@ -26,21 +39,20 @@ slug: "lib_util"
 
 #### Defined in
 
-[lib/util.ts:18](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L18)
+[lib/util.ts:29](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L29)
 
 ## Functions
 
-### filterResource
+### compareUnits
 
-▸ **filterResource**(`item`, `filter`, `matchCriteria?`): `boolean`
+▸ **compareUnits**(`quantity1`, `quantity2`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `item` | [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md) |
-| `filter` | [`FilterState`](../interfaces/lib_util.FilterState.md) |
-| `matchCriteria?` | `string`[] |
+| `quantity1` | `string` |
+| `quantity2` | `string` |
 
 #### Returns
 
@@ -48,7 +60,92 @@ slug: "lib_util"
 
 #### Defined in
 
-[lib/util.ts:85](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L85)
+[lib/util.ts:302](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L302)
+
+___
+
+### filterGeneric
+
+▸ **filterGeneric**<`T`\>(`item`, `search?`, `matchCriteria?`): `boolean`
+
+Filters a generic item based on the filter state.
+
+The item is considered to match if any of the matchCriteria (described as JSONPath)
+matches the filter.search contents. Case matching is insensitive.
+
+#### Type parameters
+
+| Name | Type |
+| :------ | :------ |
+| `T` | extends `Object` = { `[key: string]`: `any`;  } |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `item` | `T` | The item to filter. |
+| `search?` | `string` | - |
+| `matchCriteria?` | `string`[] | The JSONPath criteria to match. |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[redux/filterSlice.ts:71](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/redux/filterSlice.ts#L71)
+
+___
+
+### filterResource
+
+▸ **filterResource**(`item`, `filter`, `search?`, `matchCriteria?`): `boolean`
+
+Filters a resource based on the filter state.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `item` | [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md) \| [`KubeEvent`](../interfaces/lib_k8s_event.KubeEvent.md) | The item to filter. |
+| `filter` | `FilterState` | The filter state. |
+| `search?` | `string` | - |
+| `matchCriteria?` | `string`[] | The JSONPath criteria to match. |
+
+#### Returns
+
+`boolean`
+
+True if the item matches the filter, false otherwise.
+
+#### Defined in
+
+[redux/filterSlice.ts:24](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/redux/filterSlice.ts#L24)
+
+___
+
+### formatDuration
+
+▸ **formatDuration**(`duration`, `options?`): `string`
+
+Format a duration in milliseconds to a human-readable string.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `duration` | `number` | The duration in milliseconds. |
+| `options` | [`TimeAgoOptions`](../interfaces/lib_util.TimeAgoOptions.md) | `format` takes "brief" or "mini". "brief" rounds the date and uses the largest suitable unit (e.g. "4 weeks"). "mini" uses something like "4w" (for 4 weeks). |
+
+#### Returns
+
+`string`
+
+The formatted duration.
+
+#### Defined in
+
+[lib/util.ts:65](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L65)
 
 ___
 
@@ -60,9 +157,11 @@ ___
 
 `string` \| ``null``
 
+The current cluster name, or null if not in a cluster context.
+
 #### Defined in
 
-[lib/util.ts:154](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L154)
+[lib/cluster.ts:20](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/cluster.ts#L20)
 
 ___
 
@@ -80,9 +179,13 @@ ___
 
 `string`
 
+A path prefixed with cluster path, and the given path.
+
+The given path does not start with a /, it will be added.
+
 #### Defined in
 
-[lib/util.ts:146](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L146)
+[lib/cluster.ts:9](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/cluster.ts#L9)
 
 ___
 
@@ -103,7 +206,7 @@ ___
 
 #### Defined in
 
-[lib/util.ts:34](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L34)
+[lib/util.ts:102](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L102)
 
 ___
 
@@ -123,7 +226,7 @@ ___
 
 #### Defined in
 
-[lib/util.ts:43](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L43)
+[lib/util.ts:111](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L111)
 
 ___
 
@@ -145,7 +248,7 @@ ___
 
 #### Defined in
 
-[lib/util.ts:61](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L61)
+[lib/util.ts:129](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L129)
 
 ___
 
@@ -166,7 +269,7 @@ ___
 
 #### Defined in
 
-[lib/util.ts:51](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L51)
+[lib/util.ts:119](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L119)
 
 ___
 
@@ -186,7 +289,7 @@ ___
 
 #### Defined in
 
-[lib/util.ts:47](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L47)
+[lib/util.ts:115](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L115)
 
 ___
 
@@ -206,19 +309,20 @@ ___
 
 #### Defined in
 
-[lib/util.ts:26](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L26)
+[lib/util.ts:85](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L85)
 
 ___
 
-### timeAgo
+### normalizeUnit
 
-▸ **timeAgo**(`date`): `string`
+▸ **normalizeUnit**(`resourceType`, `quantity`): `string`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `date` | [`DateParam`](lib_util.md#dateparam) |
+| `resourceType` | `string` |
+| `quantity` | `string` |
 
 #### Returns
 
@@ -226,7 +330,32 @@ ___
 
 #### Defined in
 
-[lib/util.ts:22](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L22)
+[lib/util.ts:311](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L311)
+
+___
+
+### timeAgo
+
+▸ **timeAgo**(`date`, `options?`): `string`
+
+Show the time passed since the given date, in the desired format.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `date` | [`DateParam`](lib_util.md#dateparam) | The date since which to calculate the duration. |
+| `options` | [`TimeAgoOptions`](../interfaces/lib_util.TimeAgoOptions.md) | `format` takes "brief" or "mini". "brief" rounds the date and uses the largest suitable unit (e.g. "4 weeks"). "mini" uses something like "4w" (for 4 weeks). |
+
+#### Returns
+
+`string`
+
+The formatted date.
+
+#### Defined in
+
+[lib/util.ts:46](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L46)
 
 ___
 
@@ -246,31 +375,42 @@ ___
 
 #### Defined in
 
-[lib/util.ts:166](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L166)
+[lib/util.ts:169](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L169)
 
 ___
 
 ### useFilterFunc
 
-▸ **useFilterFunc**(`matchCriteria?`): (`item`: [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md)) => `boolean`
+▸ **useFilterFunc**<`T`\>(`matchCriteria?`): (`item`: `T`, `search?`: `string`) => `boolean`
 
-#### Parameters
+Get a function to filter kube resources based on the current global filter state.
+
+#### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `matchCriteria?` | `string`[] |
+| `T` | extends [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md) \| [`KubeEvent`](../interfaces/lib_k8s_event.KubeEvent.md) \| { `[key: string]`: `any`;  } = [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md) \| [`KubeEvent`](../interfaces/lib_k8s_event.KubeEvent.md) |
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `matchCriteria?` | `string`[] | The JSONPath criteria to match. |
 
 #### Returns
 
 `fn`
 
-▸ (`item`): `boolean`
+A filter function that can be used to filter a list of items.
+
+▸ (`item`, `search?`): `boolean`
 
 ##### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `item` | [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md) |
+| `item` | `T` |
+| `search?` | `string` |
 
 ##### Returns
 
@@ -278,4 +418,69 @@ ___
 
 #### Defined in
 
-[lib/util.ts:141](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/util.ts#L141)
+[lib/util.ts:154](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L154)
+
+___
+
+### useId
+
+▸ **useId**(`prefix?`): `undefined` \| `string`
+
+Creates a unique ID, with the given prefix.
+If UNDER_TEST is set to true, it will return the same ID every time, so snapshots do not get invalidated.
+
+#### Parameters
+
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `prefix` | `string` | `''` |
+
+#### Returns
+
+`undefined` \| `string`
+
+#### Defined in
+
+[lib/util.ts:390](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L390)
+
+___
+
+### useURLState
+
+▸ **useURLState**(`key`, `defaultValue`): [`number`, `React.Dispatch`<`React.SetStateAction`<`number`\>\>]
+
+A hook to manage a state variable that is also stored in the URL.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `key` | `string` | The name of the key in the URL. If empty, then the hook behaves like useState. |
+| `defaultValue` | `number` | - |
+
+#### Returns
+
+[`number`, `React.Dispatch`<`React.SetStateAction`<`number`\>\>]
+
+#### Defined in
+
+[lib/util.ts:194](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L194)
+
+▸ **useURLState**(`key`, `valueOrParams`): [`number`, `React.Dispatch`<`React.SetStateAction`<`number`\>\>]
+
+A hook to manage a state variable that is also stored in the URL.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `key` | `string` | The name of the key in the URL. If empty, then the hook behaves like useState. |
+| `valueOrParams` | `number` \| `URLStateParams`<`number`\> | - |
+
+#### Returns
+
+[`number`, `React.Dispatch`<`React.SetStateAction`<`number`\>\>]
+
+#### Defined in
+
+[lib/util.ts:198](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/util.ts#L198)

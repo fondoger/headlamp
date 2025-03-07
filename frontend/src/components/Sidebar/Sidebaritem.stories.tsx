@@ -1,8 +1,10 @@
-import Grid from '@material-ui/core/Grid';
-import List from '@material-ui/core/List';
-import { Meta, Story } from '@storybook/react/types-6-0';
+import Grid from '@mui/material/Grid';
+import List from '@mui/material/List';
+import { Meta, StoryFn } from '@storybook/react';
 import React from 'react';
+import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
+import store from '../../redux/stores/store';
 import SidebarItem, { SidebarItemProps } from './SidebarItem';
 
 export default {
@@ -18,19 +20,21 @@ export default {
   ],
 } as Meta;
 
-const Template: Story<SidebarItemProps> = args => {
+const Template: StoryFn<SidebarItemProps> = args => {
   return (
-    <Grid item style={{ backgroundColor: 'rgba(0, 0, 0, 0.87)' }}>
-      <List>
-        <SidebarItem {...args} />
-      </List>
-    </Grid>
+    <Provider store={store}>
+      <Grid item style={{ backgroundColor: 'rgba(0, 0, 0, 0.87)' }}>
+        <List>
+          <SidebarItem {...args} />
+        </List>
+      </Grid>
+    </Provider>
   );
 };
 
 export const Selected = Template.bind({});
 Selected.args = {
-  selectedName: 'cluster',
+  isSelected: true,
   name: 'cluster',
   label: 'Cluster',
   icon: 'mdi:hexagon-multiple-outline',
@@ -39,7 +43,7 @@ Selected.args = {
 
 export const Unselected = Template.bind({});
 Unselected.args = {
-  selectedName: 'meow',
+  isSelected: false,
   name: 'cluster',
   label: 'Cluster',
   icon: 'mdi:hexagon-multiple-outline',
@@ -48,14 +52,14 @@ Unselected.args = {
 
 export const SublistExpanded = Template.bind({});
 SublistExpanded.args = {
-  selectedName: 'cluster',
+  isSelected: true,
   name: 'cluster',
   label: 'Cluster',
   fullWidth: true,
   icon: 'mdi:hexagon-multiple-outline',
   subList: [
     {
-      selectedName: 'cluster',
+      isSelected: false,
       name: 'namespaces',
       label: 'Namespaces',
       hasParent: true,
@@ -65,14 +69,14 @@ SublistExpanded.args = {
 
 export const Sublist = Template.bind({});
 Sublist.args = {
-  selectedName: 'meow',
+  isSelected: false,
   name: 'cluster',
   label: 'Cluster',
   fullWidth: true,
   icon: 'mdi:hexagon-multiple-outline',
   subList: [
     {
-      selectedName: 'cluster',
+      isSelected: false,
       name: 'namespaces',
       label: 'Namespaces',
       hasParent: true,

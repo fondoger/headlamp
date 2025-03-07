@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
       - name: headlamp
-        image: ghcr.io/kinvolk/headlamp:latest
+        image: ghcr.io/headlamp-k8s/headlamp:latest
         args:
           - "-in-cluster"
           - "-plugins-dir=/headlamp/plugins"
@@ -41,4 +41,13 @@ spec:
           initialDelaySeconds: 30
           timeoutSeconds: 30
       nodeSelector:
-        'beta.kubernetes.io/os': linux
+        'kubernetes.io/os': linux
+---
+kind: Secret
+apiVersion: v1
+metadata:
+  name: headlamp-admin
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: "headlamp-admin"
+type: kubernetes.io/service-account-token

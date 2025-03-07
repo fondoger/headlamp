@@ -1,115 +1,66 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useClusterGroup } from '../../lib/k8s';
 import ClusterRole from '../../lib/k8s/clusterRole';
 import Role from '../../lib/k8s/role';
-import { timeAgo, useErrorState, useFilterFunc } from '../../lib/util';
+import { useNamespaces } from '../../redux/filterSlice';
 import Link from '../common/Link';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
-
-interface RolesDict {
-  [kind: string]: Role[] | null;
-}
+import ResourceListView from '../common/Resource/ResourceListView';
+import { ColumnType } from '../common/Resource/ResourceTable';
 
 export default function RoleList() {
-  const [roles, setRoles] = React.useState<RolesDict | null>(null);
-  const [roleError, setRolesError] = useErrorState(setupRoles);
-  const [clusterRoleError, setClusterRolesError] = useErrorState(setupClusterRoles);
   const { t } = useTranslation('glossary');
-  const filterFunc = useFilterFunc(['.jsonData.kind']);
+  const { items: roles, errors: rolesErrors } = Role.useList({ namespace: useNamespaces() });
+  const { items: clusterRoles, errors: clusterRolesErrors } = ClusterRole.useList();
 
-  function setupRolesWithKind(newRoles: Role[] | null, kind: string) {
-    setRoles(oldRoles => ({ ...(oldRoles || {}), [kind]: newRoles }));
-  }
+  const clusters = useClusterGroup();
+  const isMultiCluster = clusters.length > 1;
 
-  function setupRoles(roles: Role[] | null) {
-    setupRolesWithKind(roles, 'Role');
-  }
-
-  function setupClusterRoles(roles: ClusterRole[] | null) {
-    setupRolesWithKind(roles, 'ClusterRole');
-  }
-
-  function getJointItems() {
-    if (roles === null) {
+  const allRoles = React.useMemo(() => {
+    if (roles === null && clusterRoles === null) {
       return null;
     }
 
-    let joint: Role[] = [];
-    let hasItems = false;
+    return roles ? roles.concat(clusterRoles || []) : clusterRoles;
+  }, [roles, clusterRoles]);
 
-    for (const items of Object.values(roles)) {
-      if (items !== null) {
-        joint = joint.concat(items);
-        hasItems = true;
-      }
+  const allErrors = React.useMemo(() => {
+    if (rolesErrors === null && clusterRolesErrors === null) {
+      return null;
     }
 
-    return hasItems ? joint : null;
-  }
-
-  function getErrorMessage() {
-    if (getJointItems() === null) {
-      return Role.getErrorMessage(roleError || clusterRoleError);
-    }
-
-    return null;
-  }
-
-  Role.useApiList(setupRoles, setRolesError);
-  ClusterRole.useApiList(setupClusterRoles, setClusterRolesError);
+    return [...(rolesErrors ?? []), ...(clusterRolesErrors ?? [])];
+  }, [rolesErrors, clusterRolesErrors]);
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Roles')} />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={getErrorMessage()}
-        columns={[
-          {
-            label: t('Type'),
-            getter: item => item.kind,
-            sort: true,
-          },
-          {
-            label: t('frequent|Name'),
-            getter: item => (
-              <Link
-                routeName={item.metadata.namespace ? 'role' : 'clusterrole'}
-                params={{
-                  namespace: item.metadata.namespace || '',
-                  name: item.metadata.name,
-                }}
-              >
-                {item.metadata.name}
-              </Link>
-            ),
-            sort: (r1: Role, r2: Role) => {
-              if (r1.metadata.name < r2.metadata.name) {
-                return -1;
-              } else if (r1.metadata.name > r2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
-          },
-          {
-            label: t('glossary|Namespace'),
-            getter: item => item.metadata.namespace,
-            sort: true,
-          },
-          {
-            label: t('frequent|Age'),
-            getter: item => timeAgo(item.metadata.creationTimestamp),
-            sort: (r1: Role, r2: Role) =>
-              new Date(r2.metadata.creationTimestamp).getTime() -
-              new Date(r1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={getJointItems()}
-        defaultSortingColumn={4}
-      />
-    </SectionBox>
+    <ResourceListView
+      title={t('Roles')}
+      errors={allErrors}
+      columns={[
+        'type',
+        {
+          label: t('translation|Name'),
+          getValue: item => item.metadata.name,
+          gridTemplate: 'auto',
+          render: item => (
+            <Link
+              routeName={item.metadata.namespace ? 'role' : 'clusterrole'}
+              params={{
+                namespace: item.metadata.namespace || '',
+                name: item.metadata.name,
+                cluster: item.cluster,
+              }}
+            >
+              {item.metadata.name}
+            </Link>
+          ),
+        },
+        'namespace',
+        ...(isMultiCluster ? (['cluster'] as ColumnType[]) : ([] as ColumnType[])),
+        'age',
+      ]}
+      data={allRoles}
+      id="headlamp-roles"
+    />
   );
 }

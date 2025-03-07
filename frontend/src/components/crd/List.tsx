@@ -1,72 +1,83 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import CRD from '../../lib/k8s/crd';
-import { timeAgo, useFilterFunc } from '../../lib/util';
-import { Link } from '../common';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import { useNamespaces } from '../../redux/filterSlice';
+import { Link, useThrottle } from '../common';
+import ResourceListView from '../common/Resource/ResourceListView';
 
 export default function CustomResourceDefinitionList() {
-  const [crds, error] = CRD.useList();
-  const filterFunc = useFilterFunc();
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'frequent']);
+  const [items, error] = CRD.useList({ namespace: useNamespaces() });
+  const throttledItems = useThrottle(items, 1000);
+
+  const categories = React.useMemo(() => {
+    if (!items || items?.length === 0) {
+      return [];
+    }
+
+    const categories = new Set<string>();
+    items.forEach((crd: CRD) => {
+      const crdCategories = crd.getCategories() || [];
+      crdCategories.forEach(category => categories.add(category));
+    });
+
+    return Array.from(categories).sort();
+  }, [items]);
 
   return (
-    <SectionBox
-      title={<SectionFilterHeader title={t('crd|Custom Resource Definitions')} noNamespaceFilter />}
-    >
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={CRD.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: crd => (
-              <Link
-                routeName="crd"
-                params={{
-                  name: crd.metadata.name,
-                }}
-              >
-                {crd.spec.names.kind}
-              </Link>
-            ),
-          },
-          {
-            label: t('frequent|Group'),
-            getter: crd => crd.spec.group,
-            sort: true,
-          },
-          {
-            label: t('Scope'),
-            getter: crd => crd.spec.scope,
-            sort: true,
-          },
-          {
-            label: t('frequent|Full name'),
-            getter: crd => crd.metadata.name,
-            sort: (c1: CRD, c2: CRD) => {
-              if (c1.metadata.name < c2.metadata.name) {
-                return -1;
-              } else if (c1.metadata.name > c2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
-          },
-          {
-            label: t('frequent|Age'),
-            getter: crd => timeAgo(crd.metadata.creationTimestamp),
-            sort: (c1: CRD, c2: CRD) =>
-              new Date(c2.metadata.creationTimestamp).getTime() -
-              new Date(c1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={crds}
-        defaultSortingColumn={5}
-      />
-    </SectionBox>
+    <ResourceListView
+      title={t('glossary|Custom Resources')}
+      headerProps={{
+        noNamespaceFilter: false,
+      }}
+      data={throttledItems}
+      errorMessage={CRD.getErrorMessage(error)}
+      columns={[
+        {
+          label: t('glossary|Resource'),
+          getValue: (crd: CRD) => crd.spec.names.kind,
+          render: crd => (
+            <Link
+              routeName="customresources"
+              params={{
+                crd: crd.metadata.name,
+              }}
+            >
+              {crd.spec.names.kind}
+            </Link>
+          ),
+        },
+        {
+          label: t('glossary|Definition'),
+          getValue: crd => crd.metadata.name,
+          render: crd => (
+            <Link
+              routeName="crd"
+              params={{
+                name: crd.metadata.name,
+              }}
+            >
+              {crd.metadata.name}
+            </Link>
+          ),
+        },
+        {
+          label: t('translation|Group'),
+          getValue: crd => crd.spec.group,
+        },
+        {
+          label: t('Scope'),
+          getValue: crd => crd.spec.scope,
+        },
+        {
+          label: t('translation|Categories'),
+          getValue: crd => crd.getCategories()?.join(', '),
+          filterVariant: 'multi-select',
+          filterSelectOptions: categories,
+        },
+        'cluster',
+        'age',
+      ]}
+    />
   );
 }

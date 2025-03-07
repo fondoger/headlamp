@@ -1,14 +1,12 @@
----
-title: "Module: plugin/lib"
-linkTitle: "plugin/lib"
-slug: "plugin_lib"
----
+[API](../API.md) / plugin/lib
 
-The lib.ts file should carry the bits to be used by plugins whereas
-the index.ts should have the functions that Headlamp itself needs for
-loading the plugins.
+# Module: plugin/lib
 
 ## Classes
 
 - [Headlamp](../classes/plugin_lib.Headlamp.md)
 - [Plugin](../classes/plugin_lib.Plugin.md)
+
+## Interfaces
+
+- [AppMenu](../interfaces/plugin_lib.AppMenu.md)

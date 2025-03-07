@@ -1,8 +1,6 @@
----
-title: "Class: Node"
-linkTitle: "Node"
-slug: "lib_k8s_node.Node"
----
+[API](../API.md) / [lib/k8s/node](../modules/lib_k8s_node.md) / Node
+
+# Class: Node
 
 [lib/k8s/node](../modules/lib_k8s_node.md).Node
 
@@ -30,7 +28,7 @@ makeKubeObject<KubeNode\>('node').constructor
 
 #### Defined in
 
-[lib/k8s/cluster.ts:76](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L76)
+[lib/k8s/cluster.ts:318](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L318)
 
 ## Properties
 
@@ -42,17 +40,18 @@ makeKubeObject<KubeNode\>('node').constructor
 
 | Name | Type |
 | :------ | :------ |
-| `delete` | (`name`: `string`) => `Promise`<`any`\> |
-| `get` | (`name`: `string`, `cb`: [`StreamResultsCb`](../modules/lib_k8s_apiProxy.md#streamresultscb), `errCb`: [`StreamErrCb`](../modules/lib_k8s_apiProxy.md#streamerrcb)) => `Promise`<() => `void`\> |
+| `apiInfo` | { `group`: `string` ; `resource`: `string` ; `version`: `string`  }[] |
+| `delete` | (`name`: `string`, `queryParams?`: [`QueryParameters`](../interfaces/lib_k8s_apiProxy.QueryParameters.md), `cluster?`: `string`) => `Promise`<`any`\> |
+| `get` | (`name`: `string`, `cb`: [`StreamResultsCb`](../modules/lib_k8s_apiProxy.md#streamresultscb), `errCb`: [`StreamErrCb`](../modules/lib_k8s_apiProxy.md#streamerrcb), `queryParams?`: [`QueryParameters`](../interfaces/lib_k8s_apiProxy.QueryParameters.md), `cluster?`: `string`) => `Promise`<() => `void`\> |
 | `isNamespaced` | `boolean` |
-| `list` | (`cb`: [`StreamResultsCb`](../modules/lib_k8s_apiProxy.md#streamresultscb), `errCb`: [`StreamErrCb`](../modules/lib_k8s_apiProxy.md#streamerrcb)) => `Promise`<() => `void`\> |
-| `patch` | (`body`: `OpPatch`[], `name`: `string`) => `Promise`<`any`\> |
-| `post` | (`body`: [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md)) => `Promise`<`any`\> |
-| `put` | (`body`: [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md)) => `Promise`<`any`\> |
+| `list` | (`cb`: [`StreamResultsCb`](../modules/lib_k8s_apiProxy.md#streamresultscb), `errCb`: [`StreamErrCb`](../modules/lib_k8s_apiProxy.md#streamerrcb), `queryParams?`: [`QueryParameters`](../interfaces/lib_k8s_apiProxy.QueryParameters.md), `cluster?`: `string`) => `Promise`<() => `void`\> |
+| `patch` | (`body`: `OpPatch`[], `name`: `string`, `queryParams?`: [`QueryParameters`](../interfaces/lib_k8s_apiProxy.QueryParameters.md), `cluster?`: `string`) => `Promise`<`any`\> |
+| `post` | (`body`: `object` \| `JSON` \| [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md), `queryParams?`: [`QueryParameters`](../interfaces/lib_k8s_apiProxy.QueryParameters.md), `cluster?`: `string`) => `Promise`<`any`\> |
+| `put` | (`body`: [`KubeObjectInterface`](../interfaces/lib_k8s_cluster.KubeObjectInterface.md), `queryParams?`: [`QueryParameters`](../interfaces/lib_k8s_apiProxy.QueryParameters.md), `cluster?`: `string`) => `Promise`<`any`\> |
 
 #### Defined in
 
-[lib/k8s/node.ts:40](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/node.ts#L40)
+[lib/k8s/node.ts:56](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/node.ts#L56)
 
 ___
 
@@ -66,7 +65,7 @@ makeKubeObject<KubeNode\>('node').className
 
 #### Defined in
 
-[lib/k8s/cluster.ts:77](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L77)
+[lib/k8s/cluster.ts:319](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L319)
 
 ## Accessors
 
@@ -81,10 +80,11 @@ makeKubeObject<KubeNode\>('node').className
 | Name | Type |
 | :------ | :------ |
 | `podCIDR` | `string` |
+| `taints` | { `effect`: `string` ; `key`: `string`  }[] |
 
 #### Defined in
 
-[lib/k8s/node.ts:46](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/node.ts#L46)
+[lib/k8s/node.ts:62](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/node.ts#L62)
 
 ___
 
@@ -99,9 +99,20 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `addresses` | { `address`: `string` ; `type`: `string`  }[] |
-| `capacity` | { `cpu`: `any` ; `memory`: `any`  } |
+| `allocatable` | { `cpu`: `any` ; `ephemeralStorage`: `any` ; `hugepages_1Gi`: `any` ; `hugepages_2Mi`: `any` ; `memory`: `any` ; `pods`: `any`  } |
+| `allocatable.cpu` | `any` |
+| `allocatable.ephemeralStorage` | `any` |
+| `allocatable.hugepages_1Gi` | `any` |
+| `allocatable.hugepages_2Mi` | `any` |
+| `allocatable.memory` | `any` |
+| `allocatable.pods` | `any` |
+| `capacity` | { `cpu`: `any` ; `ephemeralStorage`: `any` ; `hugepages_1Gi`: `any` ; `hugepages_2Mi`: `any` ; `memory`: `any` ; `pods`: `any`  } |
 | `capacity.cpu` | `any` |
+| `capacity.ephemeralStorage` | `any` |
+| `capacity.hugepages_1Gi` | `any` |
+| `capacity.hugepages_2Mi` | `any` |
 | `capacity.memory` | `any` |
+| `capacity.pods` | `any` |
 | `conditions` | `Omit`<[`KubeCondition`](../interfaces/lib_k8s_cluster.KubeCondition.md), ``"lastProbeTime"`` \| ``"lastUpdateTime"``\> & { `lastHeartbeatTime`: `string`  }[] |
 | `nodeInfo` | { `architecture`: `string` ; `bootID`: `string` ; `containerRuntimeVersion`: `string` ; `kernelVersion`: `string` ; `kubeProxyVersion`: `string` ; `kubeletVersion`: `string` ; `machineID`: `string` ; `operatingSystem`: `string` ; `osImage`: `string` ; `systemUUID`: `string`  } |
 | `nodeInfo.architecture` | `string` |
@@ -117,19 +128,49 @@ ___
 
 #### Defined in
 
-[lib/k8s/node.ts:42](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/node.ts#L42)
+[lib/k8s/node.ts:58](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/node.ts#L58)
 
 ## Methods
 
+### getExternalIP
+
+▸ **getExternalIP**(): `string`
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[lib/k8s/node.ts:83](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/node.ts#L83)
+
+___
+
+### getInternalIP
+
+▸ **getInternalIP**(): `string`
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[lib/k8s/node.ts:87](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/node.ts#L87)
+
+___
+
 ### apiList
 
-▸ `Static` **apiList**(`onList`): `any`
+▸ `Static` **apiList**(`onList`, `onError?`, `opts?`): `any`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `onList` | (`arg`: `any`[]) => `void` |
+| `onError?` | (`err`: [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void` |
+| `opts?` | [`ApiListSingleNamespaceOptions`](../interfaces/lib_k8s_cluster.ApiListSingleNamespaceOptions.md) |
 
 #### Returns
 
@@ -141,7 +182,32 @@ makeKubeObject<KubeNode\>('node').apiList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:60](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L60)
+[lib/k8s/cluster.ts:294](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L294)
+
+___
+
+### getAuthorization
+
+▸ `Static` `Optional` **getAuthorization**(`arg`, `resourceAttrs?`): `any`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `arg` | `string` |
+| `resourceAttrs?` | [`AuthRequestResourceAttrs`](../interfaces/lib_k8s_cluster.AuthRequestResourceAttrs.md) |
+
+#### Returns
+
+`any`
+
+#### Inherited from
+
+makeKubeObject<KubeNode\>('node').getAuthorization
+
+#### Defined in
+
+[lib/k8s/cluster.ts:321](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L321)
 
 ___
 
@@ -165,7 +231,7 @@ makeKubeObject<KubeNode\>('node').getErrorMessage
 
 #### Defined in
 
-[lib/k8s/cluster.ts:75](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L75)
+[lib/k8s/cluster.ts:317](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L317)
 
 ___
 
@@ -192,7 +258,7 @@ makeKubeObject<KubeNode\>('node').useApiGet
 
 #### Defined in
 
-[lib/k8s/cluster.ts:66](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L66)
+[lib/k8s/cluster.ts:304](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L304)
 
 ___
 
@@ -218,7 +284,32 @@ makeKubeObject<KubeNode\>('node').useApiList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:61](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L61)
+[lib/k8s/cluster.ts:299](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L299)
+
+___
+
+### useGet
+
+▸ `Static` **useGet**(`name`, `namespace?`): [`any`, ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md), (`item`: `any`) => `void`, (`err`: ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void`]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `namespace?` | `string` |
+
+#### Returns
+
+[`any`, ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md), (`item`: `any`) => `void`, (`err`: ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void`]
+
+#### Inherited from
+
+makeKubeObject<KubeNode\>('node').useGet
+
+#### Defined in
+
+[lib/k8s/cluster.ts:313](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L313)
 
 ___
 
@@ -242,18 +333,18 @@ makeKubeObject<KubeNode\>('node').useList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:72](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L72)
+[lib/k8s/cluster.ts:310](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L310)
 
 ___
 
 ### useMetrics
 
-▸ `Static` **useMetrics**(): `any`[]
+▸ `Static` **useMetrics**(): [``null`` \| [`KubeMetrics`](../interfaces/lib_k8s_cluster.KubeMetrics.md)[], ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)]
 
 #### Returns
 
-`any`[]
+[``null`` \| [`KubeMetrics`](../interfaces/lib_k8s_cluster.KubeMetrics.md)[], ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)]
 
 #### Defined in
 
-[lib/k8s/node.ts:50](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/node.ts#L50)
+[lib/k8s/node.ts:66](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/node.ts#L66)

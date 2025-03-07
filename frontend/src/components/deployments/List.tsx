@@ -1,17 +1,12 @@
-import { Box } from '@material-ui/core';
-import React from 'react';
+import { Box } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { KubeContainer } from '../../lib/k8s/cluster';
 import Deployment from '../../lib/k8s/deployment';
-import { useFilterFunc } from '../../lib/util';
-import { Link, StatusLabel } from '../common';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import { LightTooltip, StatusLabel } from '../common';
+import ResourceListView from '../common/Resource/ResourceListView';
 
 export default function DeploymentsList() {
-  const [deployments, error] = Deployment.useList();
-  const filterFunc = useFilterFunc();
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   function renderPods(deployment: Deployment) {
     const { replicas, availableReplicas } = deployment.status;
@@ -50,7 +45,7 @@ export default function DeploymentsList() {
       .map((condition: any) => {
         const { type, message } = condition;
         return (
-          <Box pr={0.5} display="inline-block">
+          <Box display="inline-block">
             <StatusLabel status="">
               <span title={message} key={type}>
                 {type}
@@ -62,54 +57,98 @@ export default function DeploymentsList() {
   }
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Deployments')} />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={Deployment.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: deployment => <Link kubeObject={deployment} />,
-            sort: (d1: Deployment, d2: Deployment) => {
-              if (d1.metadata.name < d2.metadata.name) {
-                return -1;
-              } else if (d1.metadata.name > d2.metadata.name) {
-                return 1;
-              }
-              return 0;
+    <ResourceListView
+      title={t('Deployments')}
+      resourceClass={Deployment}
+      columns={[
+        'name',
+        'namespace',
+        'cluster',
+        {
+          id: 'pods',
+          label: t('Pods'),
+          getValue: deployment => deployment.status.availableReplicas,
+          render: deployment => renderPods(deployment),
+          sort: sortByPods,
+          gridTemplate: 'min-content',
+        },
+        {
+          id: 'replicas',
+          label: t('Replicas'),
+          getValue: deployment => deployment.spec.replicas || 0,
+          gridTemplate: 'min-content',
+        },
+        {
+          id: 'conditions',
+          label: t('translation|Conditions'),
+          getValue: deployment => deployment.status?.conditions?.map((c: any) => c.type)?.join(''),
+          render: deployment => renderConditions(deployment),
+          gridTemplate: 'auto',
+          cellProps: {
+            sx: {
+              flexWrap: 'wrap',
+              gap: '4px',
             },
           },
-          {
-            label: t('glossary|Namespace'),
-            getter: deployment => deployment.getNamespace(),
-            sort: true,
+        },
+        {
+          id: 'containers',
+          label: t('Containers'),
+          gridTemplate: 'auto',
+          getValue: deployment =>
+            deployment
+              .getContainers()
+              .map(c => c.name)
+              .join(', '),
+          render: deployment => {
+            const containers = deployment.getContainers().map((c: KubeContainer) => c.name);
+            const containerText = containers.join(', ');
+            const containerTooltip = containers.join('\n');
+            return (
+              <LightTooltip title={containerTooltip} interactive>
+                {containerText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('Pods'),
-            getter: deployment => renderPods(deployment),
-            sort: sortByPods,
+        },
+        {
+          id: 'images',
+          label: t('Images'),
+          gridTemplate: 'auto',
+          getValue: deployment =>
+            deployment
+              .getContainers()
+              .map(c => c.image)
+              .join(', '),
+          render: deployment => {
+            const images = deployment.getContainers().map((c: KubeContainer) => c.image);
+            const imageText = images.join(', ');
+            const imageTooltip = images.join('\n');
+            return (
+              <LightTooltip title={imageTooltip} interactive>
+                {imageText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('Replicas'),
-            getter: deployment => deployment.spec.replicas || 0,
-            sort: true,
+        },
+        {
+          id: 'selector',
+          label: t('Selector'),
+          getValue: deployment => deployment.getMatchLabelsList().join(', '),
+          render: deployment => {
+            const matchLabels = deployment.getMatchLabelsList();
+            const text = matchLabels.join(', ');
+            const tooltip = matchLabels.join('\n');
+            return (
+              <LightTooltip title={tooltip} interactive>
+                {text}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('Conditions'),
-            getter: deployment => renderConditions(deployment),
-          },
-          {
-            label: t('frequent|Age'),
-            getter: deployment => deployment.getAge(),
-            sort: (d1: Deployment, d2: Deployment) =>
-              new Date(d2.metadata.creationTimestamp).getTime() -
-              new Date(d1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={deployments}
-        defaultSortingColumn={6}
-      />
-    </SectionBox>
+          show: false,
+        },
+        'age',
+      ]}
+    />
   );
 }
