@@ -1,34 +1,38 @@
 import { Icon, IconProps } from '@iconify/react';
-import { Tooltip } from '@material-ui/core';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import ListItemText from '@material-ui/core/ListItemText';
-import { withStyles } from '@material-ui/core/styles';
+import { styled, Tooltip } from '@mui/material';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import React from 'react';
 import { Link as RouterLink, LinkProps as RouterLinkProps } from 'react-router-dom';
 
-const IconTooltip = withStyles(() => ({
-  tooltip: {
-    backgroundColor: '#474747',
-    color: '#fff',
-    minWidth: 60,
-    padding: '0.5rem',
-    fontSize: '0.8rem',
-    border: '1px solid #474747',
-    marginLeft: '1rem',
-  },
-}))(Tooltip);
+const ExpandedIconSize = 20;
+const CollapsedIconSize = 24;
 
 interface ListItemLinkProps {
   primary: string;
   pathname: string;
   search?: string;
   name: string;
+  subtitle?: string;
   icon?: IconProps['icon'];
+  iconOnly?: boolean;
+  containerProps?: {
+    [prop: string]: any;
+  };
 }
 
+// make a styled() li
+const StyledLi = styled('li')();
+
 export default function ListItemLink(props: ListItemLinkProps) {
-  const { primary, pathname, search, icon, name, ...other } = props;
+  const { primary, pathname, search, icon, name, containerProps, iconOnly, subtitle, ...other } =
+    props;
+
+  const iconSize = React.useMemo(
+    () => (iconOnly ? CollapsedIconSize : ExpandedIconSize),
+    [iconOnly]
+  );
 
   const renderLink = React.useMemo(
     () =>
@@ -41,8 +45,8 @@ export default function ListItemLink(props: ListItemLinkProps) {
 
   if (icon) {
     listItemLink = (
-      <ListItemIcon>
-        <Icon icon={icon} width={30} height={30} />
+      <ListItemIcon sx={{ minWidth: '24px' }}>
+        <Icon icon={icon} width={iconSize} height={iconSize} />
       </ListItemIcon>
     );
   }
@@ -50,18 +54,30 @@ export default function ListItemLink(props: ListItemLinkProps) {
   let listItemLinkContainer = listItemLink;
   if (!primary) {
     listItemLinkContainer = listItemLink && (
-      <IconTooltip title={name} placement="right-start">
+      <Tooltip
+        title={name}
+        placement="right-start"
+        sx={{
+          backgroundColor: '#474747',
+          color: '#fff',
+          minWidth: 60,
+          padding: '0.5rem',
+          fontSize: '0.8rem',
+          border: '1px solid #474747',
+          marginLeft: '1rem',
+        }}
+      >
         {listItemLink}
-      </IconTooltip>
+      </Tooltip>
     );
   }
 
   return (
-    <li>
+    <StyledLi {...containerProps}>
       <ListItem button component={renderLink} {...other}>
         {listItemLinkContainer}
-        <ListItemText primary={primary} />
+        {!iconOnly && <ListItemText primary={primary} secondary={subtitle} />}
       </ListItem>
-    </li>
+    </StyledLi>
   );
 }

@@ -3,8 +3,6 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    - deadcode
-    - depguard
     - dogsled
     - dupl
     - errcheck
@@ -19,16 +17,13 @@ linters:
     - gofmt
     - gofumpt
     - goimports
-    - golint
-    - gomnd
     - goprintffuncname
     - gosec
     - gosimple
     - govet
     - ineffassign
-    - interfacer
     - lll
-    - maligned
+    - govet
     - misspell
     - nakedret
     - nestif
@@ -36,28 +31,26 @@ linters:
     - nolintlint
     - prealloc
     - rowserrcheck
-    - scopelint
     - staticcheck
-    - structcheck
+    - unused
     - stylecheck
     - testpackage
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
     - wsl
   disable:
-    - exportloopref
     - gci
     - gochecknoglobals
     - godox
-    - goerr113
+    - err113
     - goheader
     - gomodguard
     - nlreturn
     - sqlclosecheck
+    - depguard
 
 linters-settings:
   gofmt:

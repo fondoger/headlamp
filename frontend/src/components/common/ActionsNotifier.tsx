@@ -1,11 +1,10 @@
-import Button from '@material-ui/core/Button';
+import Button from '@mui/material/Button';
 import _ from 'lodash';
 import { useSnackbar } from 'notistack';
-import React from 'react';
+import React, { useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { useHistory } from 'react-router-dom';
-import { CLUSTER_ACTION_GRACE_PERIOD } from '../../lib/util';
-import { ClusterAction } from '../../redux/actions/actions';
+import { CLUSTER_ACTION_GRACE_PERIOD, ClusterAction } from '../../redux/clusterActionSlice';
 import { useTypedSelector } from '../../redux/reducers/reducers';
 
 export interface PureActionsNotifierProps {
@@ -16,6 +15,7 @@ export interface PureActionsNotifierProps {
 function PureActionsNotifier({ dispatch, clusterActions }: PureActionsNotifierProps) {
   const { enqueueSnackbar, closeSnackbar } = useSnackbar();
   const history = useHistory();
+  const snackbarRefs = useRef<{ [id: string]: string | undefined }>({});
 
   function handleAction(clusterAction: ClusterAction) {
     if (_.isEmpty(clusterAction)) {
@@ -50,14 +50,32 @@ function PureActionsNotifier({ dispatch, clusterActions }: PureActionsNotifierPr
       closeSnackbar(clusterAction.dismissSnackbar);
     }
 
-    const { key, message, snackbarProps } = clusterAction;
-    enqueueSnackbar(message, {
-      key,
-      preventDuplicate: true,
-      autoHideDuration: CLUSTER_ACTION_GRACE_PERIOD,
-      action,
-      ...snackbarProps,
-    });
+    const prevKey = snackbarRefs.current[clusterAction.id];
+    const uniqueKey = `${clusterAction.key || clusterAction.id}-${Date.now()}`;
+
+    if (prevKey && prevKey !== uniqueKey) {
+      closeSnackbar(prevKey);
+    }
+
+    if (clusterAction.message) {
+      // Check for success or error states
+      const refKey =
+        clusterAction.state === 'complete'
+          ? `${clusterAction.id}-complete`
+          : clusterAction.state === 'error'
+          ? `${clusterAction.id}-error`
+          : clusterAction.id;
+
+      if (!snackbarRefs.current[refKey]) {
+        snackbarRefs.current[refKey] = uniqueKey;
+        enqueueSnackbar(clusterAction.message, {
+          key: uniqueKey,
+          autoHideDuration: clusterAction.autoHideDuration || CLUSTER_ACTION_GRACE_PERIOD,
+          action,
+          ...clusterAction.snackbarProps,
+        });
+      }
+    }
   }
 
   React.useEffect(
@@ -70,6 +88,15 @@ function PureActionsNotifier({ dispatch, clusterActions }: PureActionsNotifierPr
     [clusterActions]
   );
 
+  React.useEffect(() => {
+    return () => {
+      Object.keys(snackbarRefs.current).forEach(key => {
+        closeSnackbar(snackbarRefs.current[key]);
+        delete snackbarRefs.current[key];
+      });
+    };
+  }, [closeSnackbar]);
+
   return null;
 }
 
@@ -77,7 +104,7 @@ export { PureActionsNotifier };
 
 export default function ActionsNotifier() {
   const dispatch = useDispatch();
-  const clusterActions = useTypedSelector(state => state.clusterAction);
+  const clusterActions = useTypedSelector(state => state.clusterAction, _.isEqual);
 
   return <PureActionsNotifier dispatch={dispatch} clusterActions={clusterActions} />;
 }

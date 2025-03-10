@@ -1,8 +1,6 @@
----
-title: "Interface: KubeOwnerReference"
-linkTitle: "KubeOwnerReference"
-slug: "lib_k8s_cluster.KubeOwnerReference"
----
+[API](../API.md) / [lib/k8s/cluster](../modules/lib_k8s_cluster.md) / KubeOwnerReference
+
+# Interface: KubeOwnerReference
 
 [lib/k8s/cluster](../modules/lib_k8s_cluster.md).KubeOwnerReference
 
@@ -12,9 +10,11 @@ slug: "lib_k8s_cluster.KubeOwnerReference"
 
 • **apiVersion**: `string`
 
+API version of the referent.
+
 #### Defined in
 
-[lib/k8s/cluster.ts:45](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L45)
+[lib/k8s/cluster.ts:199](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L199)
 
 ___
 
@@ -22,9 +22,18 @@ ___
 
 • **blockOwnerDeletion**: `boolean`
 
+If true, AND if the owner has the "foregroundDeletion" finalizer, then the owner cannot
+be deleted from the key-value store until this reference is removed.
+
+**`see`** [foreground deletion](https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-deletion)
+for how the garbage collector interacts with this field and enforces the foreground deletion.
+
+Defaults to false. To set this field, a user needs "delete" permission of the owner,
+otherwise 422 (Unprocessable Entity) will be returned.
+
 #### Defined in
 
-[lib/k8s/cluster.ts:46](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L46)
+[lib/k8s/cluster.ts:211](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L211)
 
 ___
 
@@ -32,9 +41,11 @@ ___
 
 • **controller**: `boolean`
 
+If true, this reference points to the managing controller.
+
 #### Defined in
 
-[lib/k8s/cluster.ts:47](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L47)
+[lib/k8s/cluster.ts:213](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L213)
 
 ___
 
@@ -42,9 +53,11 @@ ___
 
 • **kind**: `string`
 
+Kind of the referent.
+
 #### Defined in
 
-[lib/k8s/cluster.ts:48](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L48)
+[lib/k8s/cluster.ts:215](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L215)
 
 ___
 
@@ -52,9 +65,11 @@ ___
 
 • **name**: `string`
 
+Name of the referent.
+
 #### Defined in
 
-[lib/k8s/cluster.ts:49](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L49)
+[lib/k8s/cluster.ts:217](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L217)
 
 ___
 
@@ -62,6 +77,8 @@ ___
 
 • **uid**: `string`
 
+UID of the referent.
+
 #### Defined in
 
-[lib/k8s/cluster.ts:50](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L50)
+[lib/k8s/cluster.ts:219](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L219)

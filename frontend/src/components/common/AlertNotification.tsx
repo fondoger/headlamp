@@ -1,39 +1,44 @@
-import { Box, useTheme } from '@material-ui/core';
+import { Alert, Button, Typography } from '@mui/material';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useRouteMatch } from 'react-router-dom';
-import { testAuth } from '../../lib/k8s/apiProxy';
-import { getDefaultRoutes, getRoutePath, Route } from '../../lib/router';
-import { useTypedSelector } from '../../redux/reducers/reducers';
+import { matchPath, useLocation } from 'react-router-dom';
+import { testClusterHealth } from '../../lib/k8s/apiProxy';
+import { getRoute, getRoutePath } from '../../lib/router';
+import { getCluster } from '../../lib/util';
 
-const NOT_FOUND_ERROR_MESSAGES = ['Error: Api request error: Bad Gateway', 'Offline'];
 // in ms
 const NETWORK_STATUS_CHECK_TIME = 5000;
 
 export interface PureAlertNotificationProps {
-  routes: { [path: string]: any };
-  moreRoutes: { [routeName: string]: Route };
-  testAuth(): Promise<any>;
+  checkerFunction(): Promise<any>;
 }
 
-export function PureAlertNotification({
-  routes,
-  testAuth,
-  moreRoutes,
-}: PureAlertNotificationProps) {
+// Routes where we don't show the alert notification.
+// Because maybe they already offer context about the cluster health or
+// some other reason.
+const ROUTES_WITHOUT_ALERT = ['login', 'token', 'settingsCluster'];
+
+export function PureAlertNotification({ checkerFunction }: PureAlertNotificationProps) {
   const [networkStatusCheckTimeFactor, setNetworkStatusCheckTimeFactor] = React.useState(0);
   const [error, setError] = React.useState<null | string | boolean>(null);
   const [intervalID, setIntervalID] = React.useState<NodeJS.Timeout | null>(null);
-  const { t } = useTranslation('resource');
+  const { t } = useTranslation();
+  const { pathname } = useLocation();
 
   function registerSetInterval(): NodeJS.Timeout {
     return setInterval(() => {
       if (!window.navigator.onLine) {
-        setError(t('frequent|Offline') as string);
+        setError(t('translation|Offline') as string);
         return;
       }
-      setError(null);
-      testAuth()
+
+      // Don't check for the cluster health if we are not on a cluster route.
+      if (!getCluster()) {
+        setError(null);
+        return;
+      }
+
+      checkerFunction()
         .then(() => {
           setError(false);
         })
@@ -41,7 +46,7 @@ export function PureAlertNotification({
           const error = new Error(err);
           setError(error.message);
           setNetworkStatusCheckTimeFactor(
-            networkStatusCheckTimeFactor => networkStatusCheckTimeFactor + 1
+            (networkStatusCheckTimeFactor: number) => networkStatusCheckTimeFactor + 1
           );
         });
     }, (networkStatusCheckTimeFactor + 1) * NETWORK_STATUS_CHECK_TIME);
@@ -57,6 +62,13 @@ export function PureAlertNotification({
     []
   );
 
+  // Make sure we do not show the alert notification if we are not on a cluster route.
+  React.useEffect(() => {
+    if (!getCluster()) {
+      setError(null);
+    }
+  }, [pathname]);
+
   React.useEffect(
     () => {
       if (intervalID) {
@@ -70,73 +82,75 @@ export function PureAlertNotification({
     [networkStatusCheckTimeFactor]
   );
 
-  function checkWhetherInNoAuthRequireRoute(): boolean {
-    const noAuthRequiringRoutes = Object.values(moreRoutes)
-      .concat(Object.values(routes))
-      .filter(route => route.noAuthRequired);
-
-    for (const route of noAuthRequiringRoutes) {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const routeMatch = useRouteMatch({
-        path: getRoutePath(route),
-        strict: true,
-      });
-      if (routeMatch && routeMatch.isExact) {
-        return true;
+  const showOnRoute = React.useMemo(() => {
+    for (const route of ROUTES_WITHOUT_ALERT) {
+      const routePath = getRoutePath(getRoute(route));
+      if (matchPath(pathname, routePath)?.isExact) {
+        return false;
       }
     }
-    return false;
-  }
+    return true;
+  }, [pathname]);
 
-  const whetherInNoAuthRoute = checkWhetherInNoAuthRequireRoute();
-  let isErrorInNoAuthRequiredRoute = false;
-  if (whetherInNoAuthRoute) {
-    isErrorInNoAuthRequiredRoute = true;
-  }
-  const theme = useTheme();
-  if (!error) {
+  if (!error || !showOnRoute) {
     return null;
   }
 
-  if (NOT_FOUND_ERROR_MESSAGES.filter(err => err === error).length === 0) {
-    return null;
-  }
   return (
-    <Box
-      bgcolor="error.main"
-      color={theme.palette.common.white}
-      textAlign="center"
-      display="flex"
-      p={1}
-      justifyContent="center"
-      position="fixed"
-      zIndex={1400}
-      width="100%"
-      top={'0'}
-      height={'3.8vh'}
+    <Alert
+      variant="filled"
+      severity="error"
+      sx={theme => ({
+        color: theme.palette.common.white,
+        background: theme.palette.error.main,
+        textAlign: 'center',
+        display: 'flex',
+        paddingTop: theme.spacing(0.5),
+        paddingBottom: theme.spacing(1),
+        paddingRight: theme.spacing(3),
+        justifyContent: 'center',
+        position: 'fixed',
+        zIndex: theme.zIndex.snackbar + 1,
+        top: '0',
+        alignItems: 'center',
+        left: '50%',
+        width: 'auto',
+        transform: 'translateX(-50%)',
+      })}
+      action={
+        <Button
+          sx={theme => ({
+            color: theme.palette.error.main,
+            borderColor: theme.palette.error.main,
+            background: theme.palette.common.white,
+            lineHeight: theme.typography.body2.lineHeight,
+            '&:hover': {
+              color: theme.palette.common.white,
+              borderColor: theme.palette.common.white,
+              background: theme.palette.error.dark,
+            },
+          })}
+          onClick={() => setNetworkStatusCheckTimeFactor(0)}
+          size="small"
+        >
+          {t('translation|Try Again')}
+        </Button>
+      }
     >
-      <Box marginLeft={isErrorInNoAuthRequiredRoute ? '0%' : '-15%'}>
-        {t('Something Went Wrong.')}
-      </Box>
-      <Box
-        bgcolor={theme.palette.common.white}
-        color="error.main"
-        ml={1}
-        px={1}
-        py={0.1}
-        style={{ cursor: 'pointer' }}
-        onClick={() => setNetworkStatusCheckTimeFactor(0)}
+      <Typography
+        variant="body2"
+        sx={theme => ({
+          paddingTop: theme.spacing(0.5),
+          fontWeight: 'bold',
+          fontSize: '16px',
+        })}
       >
-        {t('frequent|Try Again')}
-      </Box>
-    </Box>
+        {t('translation|Lost connection to the cluster.')}
+      </Typography>
+    </Alert>
   );
 }
 
 export default function AlertNotification() {
-  const routes = useTypedSelector(state => state.ui.routes);
-
-  return (
-    <PureAlertNotification routes={routes} testAuth={testAuth} moreRoutes={getDefaultRoutes()} />
-  );
+  return <PureAlertNotification checkerFunction={testClusterHealth} />;
 }

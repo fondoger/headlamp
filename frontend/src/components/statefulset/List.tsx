@@ -1,68 +1,81 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { KubeContainer } from '../../lib/k8s/cluster';
 import StatefulSet from '../../lib/k8s/statefulSet';
-import { useFilterFunc } from '../../lib/util';
-import { Link } from '../common';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import { LightTooltip } from '../common';
+import ResourceListView from '../common/Resource/ResourceListView';
 
 export default function StatefulSetList() {
-  const [statefulSets, error] = StatefulSet.useList();
-  const filterFunc = useFilterFunc();
   const { t } = useTranslation('glossary');
 
   function renderPods(statefulSet: StatefulSet) {
-    const { readyReplicas, currentReplicas } = statefulSet.status;
+    const { readyReplicas, replicas } = statefulSet.status;
 
-    return `${readyReplicas || 0}/${currentReplicas || 0}`;
+    return `${readyReplicas || 0}/${replicas || 0}`;
   }
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Stateful Sets')} />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={StatefulSet.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: statefulSet => <Link kubeObject={statefulSet} />,
-            sort: (s1: StatefulSet, s2: StatefulSet) => {
-              if (s1.metadata.name < s2.metadata.name) {
-                return -1;
-              } else if (s1.metadata.name > s2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
+    <ResourceListView
+      title={t('Stateful Sets')}
+      resourceClass={StatefulSet}
+      columns={[
+        'name',
+        'namespace',
+        'cluster',
+        {
+          id: 'pods',
+          label: t('Pods'),
+          getValue: statefulSet => renderPods(statefulSet),
+          gridTemplate: 'min-content',
+        },
+        {
+          id: 'replicas',
+          label: t('Replicas'),
+          getValue: statefulSet => statefulSet.spec.replicas,
+          gridTemplate: 'min-content',
+        },
+        {
+          id: 'containers',
+          label: t('Containers'),
+          gridTemplate: 'auto',
+          getValue: statefulSet =>
+            statefulSet
+              .getContainers()
+              .map(c => c.name)
+              .join(', '),
+          render: statefulSet => {
+            const containerNames = statefulSet.getContainers().map((c: KubeContainer) => c.name);
+            const containerTooltip = containerNames.join('\n');
+            const containerText = containerNames.join(', ');
+
+            return (
+              <LightTooltip title={containerTooltip} interactive>
+                {containerText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('glossary|Namespace'),
-            getter: statefulSet => statefulSet.getNamespace(),
-            sort: true,
+        },
+        {
+          id: 'images',
+          label: t('Images'),
+          gridTemplate: 'auto',
+          getValue: statefulSet =>
+            statefulSet
+              .getContainers()
+              .map(it => it.image)
+              .join(', '),
+          render: statefulSet => {
+            const containerImages = statefulSet.getContainers().map((c: KubeContainer) => c.image);
+            const containerTooltip = containerImages.join('\n');
+            const containerText = containerImages.join(', ');
+            return (
+              <LightTooltip title={containerTooltip} interactive>
+                {containerText}
+              </LightTooltip>
+            );
           },
-          {
-            label: t('Pods'),
-            getter: statefulSet => renderPods(statefulSet),
-            sort: true,
-          },
-          {
-            label: t('Replicas'),
-            getter: statefulSet => statefulSet.spec.replicas,
-            sort: true,
-          },
-          {
-            label: t('frequent|Age'),
-            getter: statefulSet => statefulSet.getAge(),
-            sort: (s1: StatefulSet, s2: StatefulSet) =>
-              new Date(s2.metadata.creationTimestamp).getTime() -
-              new Date(s1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={statefulSets}
-        defaultSortingColumn={5}
-      />
-    </SectionBox>
+        },
+        'age',
+      ]}
+    />
   );
 }

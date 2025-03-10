@@ -1,75 +1,78 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import PersistentVolumeClaim from '../../lib/k8s/persistentVolumeClaim';
-import { useFilterFunc } from '../../lib/util';
-import Link from '../common/Link';
-import { SectionBox } from '../common/SectionBox';
-import SimpleTable from '../common/SimpleTable';
+import { Link } from '../common';
+import LabelListItem from '../common/LabelListItem';
+import ResourceListView from '../common/Resource/ResourceListView';
+import { makePVCStatusLabel } from './ClaimDetails';
 
 export default function VolumeClaimList() {
-  const [volumeClaim, error] = PersistentVolumeClaim.useList();
-  const filterFunc = useFilterFunc();
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   return (
-    <SectionBox
-      title={t('Volume Claims')}
-      headerProps={{
-        headerStyle: 'main',
-      }}
-    >
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={PersistentVolumeClaim.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: volumeClaim => <Link kubeObject={volumeClaim} />,
-            sort: (v1: PersistentVolumeClaim, v2: PersistentVolumeClaim) => {
-              if (v1.metadata.name < v2.metadata.name) {
-                return -1;
-              } else if (v1.metadata.name > v2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
+    <ResourceListView
+      title={t('Persistent Volume Claims')}
+      resourceClass={PersistentVolumeClaim}
+      columns={[
+        'name',
+        'namespace',
+        {
+          id: 'className',
+          label: t('Class Name'),
+          getValue: volumeClaim => volumeClaim.spec?.storageClassName,
+          render: volumeClaim => {
+            const name = volumeClaim.spec?.storageClassName;
+            if (!name) {
+              return '';
+            }
+            return (
+              <Link routeName="storageClass" params={{ name }} tooltip>
+                {name}
+              </Link>
+            );
           },
-          {
-            label: t('glossary|Namespace'),
-            getter: volumeClaim => volumeClaim.getNamespace(),
-            sort: true,
+        },
+        {
+          id: 'capacity',
+          label: t('Capacity'),
+          getValue: volumeClaim => volumeClaim.status?.capacity?.storage,
+          gridTemplate: 0.8,
+        },
+        {
+          id: 'accessModes',
+          label: t('Access Modes'),
+          getValue: volumeClaim => volumeClaim.spec?.accessModes?.join(', '),
+          render: volumeClaim => <LabelListItem labels={volumeClaim.spec?.accessModes || []} />,
+        },
+        {
+          id: 'volumeMode',
+          label: t('Volume Mode'),
+          getValue: volumeClaim => volumeClaim.spec?.volumeMode,
+        },
+        {
+          id: 'volume',
+          label: t('Volume'),
+          getValue: volumeClaim => volumeClaim.spec?.volumeName,
+          render: volumeClaim => {
+            const name = volumeClaim.spec?.volumeName;
+            if (!name) {
+              return '';
+            }
+            return (
+              <Link routeName="persistentVolume" params={{ name }} tooltip>
+                {name}
+              </Link>
+            );
           },
-          {
-            label: t('Status'),
-            getter: volumeClaim => volumeClaim.status.phase,
-            sort: true,
-          },
-          {
-            label: t('Class Name'),
-            getter: volumeClaim => volumeClaim.spec.storageClassName,
-            sort: true,
-          },
-          {
-            label: t('Volume'),
-            getter: volumeClaim => volumeClaim.spec.volumeName,
-            sort: true,
-          },
-          {
-            label: t('Capacity'),
-            getter: volumeClaim => volumeClaim.status.capacity?.storage,
-          },
-          {
-            label: t('frequent|Age'),
-            getter: volumeClaim => volumeClaim.getAge(),
-            sort: (v1: PersistentVolumeClaim, v2: PersistentVolumeClaim) =>
-              new Date(v2.metadata.creationTimestamp).getTime() -
-              new Date(v1.metadata.creationTimestamp).getTime(),
-          },
-        ]}
-        data={volumeClaim}
-        defaultSortingColumn={7}
-      />
-    </SectionBox>
+        },
+        {
+          id: 'status',
+          label: t('translation|Status'),
+          getValue: volume => volume.status?.phase,
+          render: volume => makePVCStatusLabel(volume),
+          gridTemplate: 0.3,
+        },
+        'age',
+      ]}
+    />
   );
 }

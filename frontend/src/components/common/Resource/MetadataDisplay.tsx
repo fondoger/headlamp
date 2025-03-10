@@ -1,39 +1,44 @@
 import { Icon } from '@iconify/react';
-import Grid from '@material-ui/core/Grid';
-import IconButton from '@material-ui/core/IconButton';
-import { makeStyles } from '@material-ui/core/styles';
-import Typography, { TypographyProps } from '@material-ui/core/Typography';
+import { Box } from '@mui/material';
+import Grid from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
+import Typography, { TypographyProps } from '@mui/material/Typography';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ResourceClasses } from '../../../lib/k8s';
-import { KubeObject, KubeObjectInterface, KubeOwnerReference } from '../../../lib/k8s/cluster';
+import { KubeOwnerReference } from '../../../lib/k8s/cluster';
+import { KubeObject } from '../../../lib/k8s/KubeObject';
+import Theme from '../../../lib/themes';
 import { localeDate } from '../../../lib/util';
 import { NameValueTable, NameValueTableRow } from '../../common/SimpleTable';
 import Link from '../Link';
 import { LightTooltip } from '../Tooltip';
 
-export const useMetadataDisplayStyles = makeStyles(theme => ({
-  metadataValueLabel: {
-    color: theme.palette.text.primary,
-    backgroundColor: theme.palette.metadataBgColor,
-    fontSize: '1.1em',
-    wordBreak: 'break-word',
-    paddingLeft: theme.spacing(1),
-    paddingRight: theme.spacing(1),
-  },
-}));
+type ExtraRowsFunc<T extends KubeObject> = (resource: T) => NameValueTableRow[] | null;
 
-type ExtraRowsFunc = (resource: KubeObjectInterface) => NameValueTableRow[] | null;
+export const metadataStyles = (theme: typeof Theme.light) => ({
+  color: theme.palette.text.primary,
+  backgroundColor: theme.palette.metadataBgColor,
+  fontSize: theme.typography.pxToRem(16),
+  wordBreak: 'break-word',
+  paddingLeft: theme.spacing(1),
+  paddingRight: theme.spacing(1),
+  marginRight: theme.spacing(1),
+  overflow: 'hidden',
+  whiteSpace: 'nowrap',
+  overflowWrap: 'anywhere',
+  textOverflow: 'ellipsis',
+});
 
-export interface MetadataDisplayProps {
-  resource: KubeObject;
-  extraRows?: ExtraRowsFunc | NameValueTableRow[] | null;
+export interface MetadataDisplayProps<T extends KubeObject = KubeObject> {
+  resource: T;
+  extraRows?: ExtraRowsFunc<T> | NameValueTableRow[] | null;
 }
 
-export function MetadataDisplay(props: MetadataDisplayProps) {
+export function MetadataDisplay<T extends KubeObject>(props: MetadataDisplayProps<T>) {
   const { resource, extraRows } = props;
-  const { t } = useTranslation('resource');
-  let makeExtraRows: ExtraRowsFunc;
+  const { t } = useTranslation();
+  let makeExtraRows: ExtraRowsFunc<T>;
 
   function makeOwnerReferences(ownerReferences: KubeOwnerReference[]) {
     if (!resource || ownerReferences === undefined) {
@@ -45,21 +50,36 @@ export function MetadataDisplay(props: MetadataDisplayProps) {
       return undefined;
     }
 
-    return ownerReferences.map((ownerRef, i) => (
-      <>
-        {ownerRef.kind in ResourceClasses ? (
-          <Link
-            routeName={new ResourceClasses[ownerRef.kind]().detailsRoute}
-            params={{ name: ownerRef.name, namespace: resource.metadata.namespace }}
-          >
-            {ownerRef.kind}: {ownerRef.name}
-          </Link>
-        ) : (
-          `${ownerRef.kind}: ${ownerRef.name}`
-        )}
-        {i < numItems - 1 && <br />}
-      </>
-    ));
+    return ownerReferences
+      .map((ownerRef, i) => {
+        if (ownerRef.kind in ResourceClasses) {
+          let routeName;
+          try {
+            routeName = ResourceClasses[ownerRef.kind as keyof typeof ResourceClasses].detailsRoute;
+          } catch (e) {
+            console.error(`Error getting routeName for {ownerRef.kind}`, e);
+            return null;
+          }
+          return (
+            <>
+              <Link
+                routeName={routeName}
+                params={{ name: ownerRef.name, namespace: resource.metadata.namespace }}
+              >
+                {ownerRef.kind}: {ownerRef.name}
+              </Link>
+              {i < numItems - 1 && <br />}
+            </>
+          );
+        }
+        return (
+          <>
+            {`${ownerRef.kind}: ${ownerRef.name}`}
+            {i < numItems - 1 && <br />}
+          </>
+        );
+      })
+      .filter(element => element !== null);
   }
 
   if (typeof extraRows === 'function') {
@@ -73,12 +93,16 @@ export function MetadataDisplay(props: MetadataDisplayProps) {
   const mainRows = (
     [
       {
-        name: t('frequent|Name'),
+        name: t('translation|Name'),
         value: resource.metadata.name,
       },
       {
         name: t('glossary|Namespace'),
-        value: resource.metadata.namespace && resource.metadata.namespace,
+        value: resource.metadata.namespace && (
+          <Link routeName={'namespace'} params={{ name: resource.metadata.namespace }}>
+            {resource.metadata.namespace}
+          </Link>
+        ),
         hide: !resource.metadata.namespace,
       },
       {
@@ -108,7 +132,11 @@ export function MetadataDisplay(props: MetadataDisplayProps) {
     ] as NameValueTableRow[]
   ).concat(makeExtraRows(resource) || []);
 
-  return <NameValueTable rows={mainRows} />;
+  return (
+    <Box>
+      <NameValueTable rows={mainRows} />
+    </Box>
+  );
 }
 
 interface MetadataDictGridProps {
@@ -123,7 +151,6 @@ interface MetadataDictGridProps {
 }
 
 export function MetadataDictGrid(props: MetadataDictGridProps) {
-  const classes = useMetadataDisplayStyles({});
   const { dict, showKeys = true, gridProps } = props;
   const [expanded, setExpanded] = React.useState(false);
   const defaultNumShown = 20;
@@ -131,7 +158,25 @@ export function MetadataDictGrid(props: MetadataDictGridProps) {
   const keys = Object.keys(dict || []);
 
   const MetadataEntry = React.forwardRef((props: TypographyProps, ref: any) => {
-    return <Typography {...props} className={classes.metadataValueLabel} ref={ref} />;
+    return (
+      <Typography
+        {...props}
+        sx={theme => ({
+          color: theme.palette.text.primary,
+          backgroundColor: theme.palette.metadataBgColor,
+          fontSize: theme.typography.pxToRem(16),
+          wordBreak: 'break-word',
+          paddingLeft: theme.spacing(1),
+          paddingRight: theme.spacing(1),
+          marginRight: theme.spacing(1),
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          overflowWrap: 'anywhere',
+          textOverflow: 'ellipsis',
+        })}
+        ref={ref}
+      />
+    );
   });
 
   function makeLabel(key: string | number) {

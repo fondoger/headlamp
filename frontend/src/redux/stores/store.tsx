@@ -1,27 +1,28 @@
-import { applyMiddleware, compose, createStore } from 'redux';
-import createSagaMiddleware from 'redux-saga';
-import { INITIAL_STATE as CONFIG_INITIAL_STATE } from '../reducers/config';
-import { INITIAL_STATE as FILTER_INITIAL_STATE } from '../reducers/filter';
+import { configureStore } from '@reduxjs/toolkit';
+import { initialState as CLUSTER_ACTIONS_INITIAL_STATE } from '../clusterActionSlice';
+import { initialState as CONFIG_INITIAL_STATE } from '../configSlice';
+import { initialState as FILTER_INITIAL_STATE } from '../filterSlice';
+import { listenerMiddleware } from '../headlampEventSlice';
 import reducers from '../reducers/reducers';
 import { INITIAL_STATE as UI_INITIAL_STATE } from '../reducers/ui';
-import rootSaga from '../sagas/sagas';
 
-const initialState = {
-  filter: FILTER_INITIAL_STATE,
-  ui: UI_INITIAL_STATE,
-  config: CONFIG_INITIAL_STATE,
-};
-
-const sagaMiddleware = createSagaMiddleware();
-
-const composeEnhancers = (window as any).__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
-
-const store = createStore(
-  reducers,
-  initialState,
-  composeEnhancers(applyMiddleware(sagaMiddleware))
-);
+const store = configureStore({
+  reducer: reducers,
+  preloadedState: {
+    filter: FILTER_INITIAL_STATE,
+    ui: UI_INITIAL_STATE,
+    config: CONFIG_INITIAL_STATE,
+    clusterAction: CLUSTER_ACTIONS_INITIAL_STATE,
+  },
+  middleware: getDefaultMiddleware =>
+    getDefaultMiddleware({
+      serializableCheck: false,
+      thunk: true,
+    }).prepend(listenerMiddleware.middleware),
+});
 
 export default store;
 
-sagaMiddleware.run(rootSaga);
+export type AppDispatch = typeof store.dispatch;
+export type RootState = ReturnType<typeof store.getState>;
+export type AppStore = typeof store;
