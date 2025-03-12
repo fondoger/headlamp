@@ -1,8 +1,6 @@
----
-title: "Class: CronJob"
-linkTitle: "CronJob"
-slug: "lib_k8s_cronJob.CronJob"
----
+[API](../API.md) / [lib/k8s/cronJob](../modules/lib_k8s_cronJob.md) / CronJob
+
+# Class: CronJob
 
 [lib/k8s/cronJob](../modules/lib_k8s_cronJob.md).CronJob
 
@@ -30,7 +28,7 @@ makeKubeObject<KubeCronJob\>('CronJob').constructor
 
 #### Defined in
 
-[lib/k8s/cluster.ts:76](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L76)
+[lib/k8s/cluster.ts:318](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L318)
 
 ## Properties
 
@@ -42,9 +40,18 @@ makeKubeObject<KubeCronJob\>('CronJob').constructor
 
 ▪ [other: `string`]: `any`
 
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `scale?` | { `get`: (`namespace`: `string`, `name`: `string`, `clusterName?`: `string`) => `Promise`<`any`\> ; `patch`: (`body`: { `spec`: { `replicas`: `number`  }  }, `metadata`: [`KubeMetadata`](../interfaces/lib_k8s_cluster.KubeMetadata.md), `clusterName?`: `string`) => `Promise`<`any`\> ; `put`: (`body`: { `metadata`: [`KubeMetadata`](../interfaces/lib_k8s_cluster.KubeMetadata.md) ; `spec`: { `replicas`: `number`  }  }, `clusterName?`: `string`) => `Promise`<`any`\>  } |
+| `scale.get` | (`namespace`: `string`, `name`: `string`, `clusterName?`: `string`) => `Promise`<`any`\> |
+| `scale.patch` | (`body`: { `spec`: { `replicas`: `number`  }  }, `metadata`: [`KubeMetadata`](../interfaces/lib_k8s_cluster.KubeMetadata.md), `clusterName?`: `string`) => `Promise`<`any`\> |
+| `scale.put` | (`body`: { `metadata`: [`KubeMetadata`](../interfaces/lib_k8s_cluster.KubeMetadata.md) ; `spec`: { `replicas`: `number`  }  }, `clusterName?`: `string`) => `Promise`<`any`\> |
+
 #### Defined in
 
-[lib/k8s/cronJob.ts:20](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cronJob.ts#L20)
+[lib/k8s/cronJob.ts:38](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cronJob.ts#L38)
 
 ___
 
@@ -58,7 +65,7 @@ makeKubeObject<KubeCronJob\>('CronJob').className
 
 #### Defined in
 
-[lib/k8s/cluster.ts:77](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L77)
+[lib/k8s/cluster.ts:319](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L319)
 
 ## Accessors
 
@@ -72,7 +79,7 @@ makeKubeObject<KubeCronJob\>('CronJob').className
 
 #### Defined in
 
-[lib/k8s/cronJob.ts:25](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cronJob.ts#L25)
+[lib/k8s/cronJob.ts:43](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cronJob.ts#L43)
 
 ___
 
@@ -86,19 +93,35 @@ ___
 
 #### Defined in
 
-[lib/k8s/cronJob.ts:29](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cronJob.ts#L29)
+[lib/k8s/cronJob.ts:47](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cronJob.ts#L47)
 
 ## Methods
 
+### getContainers
+
+▸ **getContainers**(): [`KubeContainer`](../interfaces/lib_k8s_cluster.KubeContainer.md)[]
+
+#### Returns
+
+[`KubeContainer`](../interfaces/lib_k8s_cluster.KubeContainer.md)[]
+
+#### Defined in
+
+[lib/k8s/cronJob.ts:51](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cronJob.ts#L51)
+
+___
+
 ### apiList
 
-▸ `Static` **apiList**(`onList`): `any`
+▸ `Static` **apiList**(`onList`, `onError?`, `opts?`): `any`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `onList` | (`arg`: `any`[]) => `void` |
+| `onError?` | (`err`: [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void` |
+| `opts?` | [`ApiListSingleNamespaceOptions`](../interfaces/lib_k8s_cluster.ApiListSingleNamespaceOptions.md) |
 
 #### Returns
 
@@ -110,7 +133,32 @@ makeKubeObject<KubeCronJob\>('CronJob').apiList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:60](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L60)
+[lib/k8s/cluster.ts:294](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L294)
+
+___
+
+### getAuthorization
+
+▸ `Static` `Optional` **getAuthorization**(`arg`, `resourceAttrs?`): `any`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `arg` | `string` |
+| `resourceAttrs?` | [`AuthRequestResourceAttrs`](../interfaces/lib_k8s_cluster.AuthRequestResourceAttrs.md) |
+
+#### Returns
+
+`any`
+
+#### Inherited from
+
+makeKubeObject<KubeCronJob\>('CronJob').getAuthorization
+
+#### Defined in
+
+[lib/k8s/cluster.ts:321](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L321)
 
 ___
 
@@ -134,7 +182,7 @@ makeKubeObject<KubeCronJob\>('CronJob').getErrorMessage
 
 #### Defined in
 
-[lib/k8s/cluster.ts:75](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L75)
+[lib/k8s/cluster.ts:317](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L317)
 
 ___
 
@@ -161,7 +209,7 @@ makeKubeObject<KubeCronJob\>('CronJob').useApiGet
 
 #### Defined in
 
-[lib/k8s/cluster.ts:66](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L66)
+[lib/k8s/cluster.ts:304](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L304)
 
 ___
 
@@ -187,7 +235,32 @@ makeKubeObject<KubeCronJob\>('CronJob').useApiList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:61](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L61)
+[lib/k8s/cluster.ts:299](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L299)
+
+___
+
+### useGet
+
+▸ `Static` **useGet**(`name`, `namespace?`): [`any`, ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md), (`item`: `any`) => `void`, (`err`: ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void`]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `name` | `string` |
+| `namespace?` | `string` |
+
+#### Returns
+
+[`any`, ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md), (`item`: `any`) => `void`, (`err`: ``null`` \| [`ApiError`](../interfaces/lib_k8s_apiProxy.ApiError.md)) => `void`]
+
+#### Inherited from
+
+makeKubeObject<KubeCronJob\>('CronJob').useGet
+
+#### Defined in
+
+[lib/k8s/cluster.ts:313](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L313)
 
 ___
 
@@ -211,4 +284,4 @@ makeKubeObject<KubeCronJob\>('CronJob').useList
 
 #### Defined in
 
-[lib/k8s/cluster.ts:72](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L72)
+[lib/k8s/cluster.ts:310](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L310)

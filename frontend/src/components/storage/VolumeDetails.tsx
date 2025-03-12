@@ -1,28 +1,30 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import PersistentVolume from '../../lib/k8s/persistentVolume';
-import { StatusLabel } from '../common/Label';
+import { Link } from '../common';
 import { DetailsGrid } from '../common/Resource';
+import { StatusLabelByPhase } from './utils';
 
-export default function VolumeDetails() {
-  const { name } = useParams<{ namespace: string; name: string }>();
-  const { t } = useTranslation('glossary');
+export function makePVStatusLabel(item: PersistentVolume) {
+  const status = item.status!.phase;
+  return StatusLabelByPhase(status);
+}
 
-  function makeStatusLabel(item: PersistentVolume) {
-    const status = item.status!.phase;
-    return <StatusLabel status={status === 'Bound' ? 'success' : 'error'}>{status}</StatusLabel>;
-  }
+export default function VolumeDetails(props: { name?: string }) {
+  const params = useParams<{ name: string }>();
+  const { name = params.name } = props;
+  const { t } = useTranslation(['glossary', 'translation']);
 
   return (
     <DetailsGrid
       resourceType={PersistentVolume}
       name={name}
+      withEvents
       extraInfo={item =>
         item && [
           {
-            name: t('Status'),
-            value: makeStatusLabel(item),
+            name: t('translation|Status'),
+            value: makePVStatusLabel(item),
           },
           {
             name: t('Capacity'),
@@ -38,7 +40,11 @@ export default function VolumeDetails() {
           },
           {
             name: t('Storage Class'),
-            value: item.spec!.storageClassName,
+            value: (
+              <Link routeName="storageClass" params={{ name: item.spec!.storageClassName }} tooltip>
+                {item.spec!.storageClassName}
+              </Link>
+            ),
           },
         ]
       }

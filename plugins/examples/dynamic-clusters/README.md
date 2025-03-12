@@ -1,17 +1,39 @@
-# Set up clusters dynamically
+# Example Plugin: Set up clusters dynamically
 
-This is the official TypeScript template for [Headlamp Plugins](https://github.com/kinvolk/headlamp).
+Configure (or update) a cluster dynamically that can then be used throughout Headlamp.
 
-To use this template to start a new plugin with the npx command (comes with Node.js):
+Headlamp supports both dynamic and static cluster configurations.
 
-```sh
-npx create-react-app headlamp-myfancy --template headlamp
+### Static Clusters (Default):
+
+- If dynamic cluster is disabled (default setting), Headlamp prompts users to manually enter information about the cluster, including the cluster name and server details.
+- Users can submit the form, and Headlamp will load the cluster based on the provided information.
+
+<img width="584" alt="dynamic cluster is disabled" src="https://github.com/headlamp-k8s/headlamp/assets/24803604/8b67f739-dd41-4114-9f2f-93f8cf2bbf0a">
+
+### Dynamic Clusters (Enable with -enable-dynamic-clusters flag):
+
+- When dynamic cluster is enabled on the backend using the -enable-dynamic-clusters flag, Headlamp allows users to paste the base64 encoded value of their kubeconfig.
+- Upon submission, Headlamp seamlessly loads the cluster statelessly using the provided kubeconfig information.
+
+<img width="763" alt="dynamic cluster is enabled" src="https://github.com/headlamp-k8s/headlamp/assets/24803604/19bceb85-9d68-44bc-a8b4-e0303da09f70">
+
+## Running the plugin
+
+To run the plugin with [node.js](https://nodejs.org/en/) installed:
+
+```bash
+git clone git@github.com:kinvolk/headlamp.git
+cd headlamp/plugins/examples/dynamic-clusters/
+npm install
+npm start
 ```
 
-For more information, please refer to:
+The main code for the plugin is in [src/index.tsx](src/index.tsx).
 
-- [Create React App Custom Templates](https://create-react-app.dev/docs/custom-templates/)
-- [Getting Started](https://kinvolk.io/docs/headlamp/latest/development/plugins/), How to create a new Headlamp plugin.
-- [API Reference](https://kinvolk.io/docs/headlamp/latest/development/api/), API documentation for what you can do
-- [UI Component Storybook](https://kinvolk.io/docs/headlamp/latest/development/storybook/), pre-existing components you can use when creating your plugin.
-- [Plugin Examples](https://kinvolk.io/docs/headlamp/latest/development/plugins/examples/), Example plugins you can look at to see how it's done.
+## Further information
+
+See:
+
+- API documentation for [Headlamp.setCluster](https://headlamp.dev/docs/latest/development/api/classes/plugin_lib.headlamp/#setcluster)
+- The [getting started documentation for Headlamp plugin development](https://headlamp.dev/docs/latest/development/plugins/building/)

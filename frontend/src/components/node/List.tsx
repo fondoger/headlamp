@@ -1,92 +1,154 @@
-import { makeStyles } from '@material-ui/core/styles';
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import Node from '../../lib/k8s/node';
-import { useFilterFunc } from '../../lib/util';
-import { Link } from '../common';
-import { SectionBox } from '../common/SectionBox';
-import SectionFilterHeader from '../common/SectionFilterHeader';
-import SimpleTable from '../common/SimpleTable';
+import { getResourceMetrics } from '../../lib/util';
+import { HoverInfoLabel } from '../common';
+import ResourceListView from '../common/Resource/ResourceListView';
 import { UsageBarChart } from './Charts';
 import { NodeReadyLabel } from './Details';
-
-const useStyle = makeStyles({
-  chartCell: {
-    width: '20%',
-  },
-});
+import { NodeTaintsLabel } from './utils';
 
 export default function NodeList() {
-  const classes = useStyle();
-  const [nodes, error] = Node.useList();
   const [nodeMetrics, metricsError] = Node.useMetrics();
-  const filterFunc = useFilterFunc();
-  const { t } = useTranslation('glossary');
+  const { t } = useTranslation(['glossary', 'translation']);
 
   const noMetrics = metricsError?.status === 404;
 
   return (
-    <SectionBox title={<SectionFilterHeader title={t('Nodes')} noNamespaceFilter />}>
-      <SimpleTable
-        rowsPerPage={[15, 25, 50]}
-        filterFunction={filterFunc}
-        errorMessage={Node.getErrorMessage(error)}
-        columns={[
-          {
-            label: t('frequent|Name'),
-            getter: node => <Link kubeObject={node} />,
-            sort: (n1: Node, n2: Node) => {
-              if (n1.metadata.name < n2.metadata.name) {
-                return -1;
-              } else if (n1.metadata.name > n2.metadata.name) {
-                return 1;
-              }
-              return 0;
-            },
+    <ResourceListView
+      title={t('Nodes')}
+      headerProps={{
+        noNamespaceFilter: true,
+      }}
+      resourceClass={Node}
+      columns={[
+        'name',
+        'cluster',
+        {
+          id: 'cpu',
+          label: t('CPU'),
+          gridTemplate: 'min-content',
+          getValue: node => {
+            const [used] = getResourceMetrics(node, nodeMetrics || [], 'cpu');
+            return used;
           },
-          {
-            label: t('frequent|Ready'),
-            getter: node => <NodeReadyLabel node={node} />,
+          render: node => (
+            <UsageBarChart
+              node={node}
+              nodeMetrics={nodeMetrics}
+              resourceType="cpu"
+              noMetrics={noMetrics}
+            />
+          ),
+        },
+        {
+          id: 'memory',
+          label: t('Memory'),
+          getValue: node => {
+            const [used] = getResourceMetrics(node, nodeMetrics || [], 'memory');
+            return used;
           },
-          {
-            label: t('CPU'),
-            cellProps: {
-              className: classes.chartCell,
-            },
-            getter: node => (
-              <UsageBarChart
-                node={node}
-                nodeMetrics={nodeMetrics}
-                resourceType="cpu"
-                noMetrics={noMetrics}
-              />
-            ),
+          render: node => (
+            <UsageBarChart
+              node={node}
+              nodeMetrics={nodeMetrics}
+              resourceType="memory"
+              noMetrics={noMetrics}
+            />
+          ),
+        },
+        {
+          id: 'ready',
+          label: t('translation|Ready'),
+          getValue: node => {
+            const isReady = !!node.status.conditions?.find(
+              condition => condition.type === 'Ready' && condition.status === 'True'
+            );
+            return isReady ? t('translation|Yes') : t('translation|No');
           },
-          {
-            label: t('Memory'),
-            cellProps: {
-              className: classes.chartCell,
-            },
-            getter: node => (
-              <UsageBarChart
-                node={node}
-                nodeMetrics={nodeMetrics}
-                resourceType="memory"
-                noMetrics={noMetrics}
-              />
-            ),
+          render: node => <NodeReadyLabel node={node} />,
+        },
+        {
+          id: 'taints',
+          label: t('translation|Taints'),
+          getValue: node =>
+            node.spec?.taints?.map(taint => `${taint.key}:${taint.effect}`)?.join(', '),
+          render: (item: Node) => <NodeTaintsLabel node={item} />,
+        },
+        {
+          id: 'roles',
+          label: t('Roles'),
+          gridTemplate: 'minmax(150px, .5fr)',
+          getValue: node => {
+            return Object.keys(node.metadata.labels ?? {})
+              .filter((t: String) => t.startsWith('node-role.kubernetes.io/'))
+              .map(t => t.replace('node-role.kubernetes.io/', ''))
+              .join(',');
           },
-          {
-            label: t('frequent|Age'),
-            getter: node => node.getAge(),
-            sort: (n1: Node, n2: Node) =>
-              new Date(n2.metadata.creationTimestamp).getTime() -
-              new Date(n1.metadata.creationTimestamp).getTime(),
+        },
+        {
+          id: 'internalIP',
+          label: t('translation|Internal IP'),
+          getValue: node => node.getInternalIP(),
+        },
+        {
+          id: 'externalIP',
+          label: t('External IP'),
+          getValue: node => node.getExternalIP() || t('translation|None'),
+        },
+        {
+          id: 'version',
+          label: t('translation|Version'),
+          gridTemplate: 'minmax(150px, .5fr)',
+          getValue: node => node.status.nodeInfo?.kubeletVersion,
+        },
+        {
+          id: 'software',
+          label: t('translation|Software'),
+          gridTemplate: 'minmax(200px, 1.5fr)',
+          getValue: node => node.status.nodeInfo?.operatingSystem,
+          render: node => {
+            if (node.status.nodeInfo === undefined) {
+              return <></>;
+            }
+            let osIcon = 'mdi:desktop-classic';
+            if (node.status.nodeInfo.operatingSystem === 'linux') {
+              osIcon = 'mdi:linux';
+            } else if (node.status.nodeInfo.operatingSystem === 'windows') {
+              osIcon = 'mdi:microsoft-windows';
+            }
+
+            return (
+              <>
+                <HoverInfoLabel
+                  label={node.status.nodeInfo.osImage}
+                  hoverInfo={t('OS image')}
+                  labelProps={{ variant: 'body2' }}
+                  iconPosition="start"
+                  icon={osIcon}
+                />
+                {node.status.nodeInfo.kernelVersion && (
+                  <HoverInfoLabel
+                    label={node.status.nodeInfo.kernelVersion}
+                    hoverInfo={t('Kernel version')}
+                    labelProps={{ variant: 'body2' }}
+                    iconPosition="start"
+                    icon="mdi:nut"
+                  />
+                )}
+                <HoverInfoLabel
+                  label={node.status.nodeInfo.containerRuntimeVersion}
+                  hoverInfo={t('Container Runtime')}
+                  labelProps={{ variant: 'body2' }}
+                  iconPosition="start"
+                  icon="mdi:train-car-container"
+                />
+              </>
+            );
           },
-        ]}
-        data={nodes}
-        defaultSortingColumn={5}
-      />
-    </SectionBox>
+          show: false,
+        },
+        'age',
+      ]}
+    />
   );
 }

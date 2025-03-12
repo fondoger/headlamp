@@ -1,8 +1,6 @@
----
-title: "Interface: KubeStatefulSet"
-linkTitle: "KubeStatefulSet"
-slug: "lib_k8s_statefulSet.KubeStatefulSet"
----
+[API](../API.md) / [lib/k8s/statefulSet](../modules/lib_k8s_statefulSet.md) / KubeStatefulSet
+
+# Interface: KubeStatefulSet
 
 [lib/k8s/statefulSet](../modules/lib_k8s_statefulSet.md).KubeStatefulSet
 
@@ -24,7 +22,7 @@ slug: "lib_k8s_statefulSet.KubeStatefulSet"
 
 #### Defined in
 
-[lib/k8s/cluster.ts:23](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L23)
+[lib/k8s/cluster.ts:56](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L56)
 
 ___
 
@@ -32,13 +30,22 @@ ___
 
 • **kind**: `string`
 
+Kind is a string value representing the REST resource this object represents.
+Servers may infer this from the endpoint the client submits requests to.
+
+In CamelCase.
+
+Cannot be updated.
+
+**`see`** [more info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds)
+
 #### Inherited from
 
 [KubeObjectInterface](lib_k8s_cluster.KubeObjectInterface.md).[kind](lib_k8s_cluster.KubeObjectInterface.md#kind)
 
 #### Defined in
 
-[lib/k8s/cluster.ts:22](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L22)
+[lib/k8s/cluster.ts:55](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L55)
 
 ___
 
@@ -52,7 +59,7 @@ ___
 
 #### Defined in
 
-[lib/k8s/cluster.ts:24](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/cluster.ts#L24)
+[lib/k8s/cluster.ts:57](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/cluster.ts#L57)
 
 ___
 
@@ -69,6 +76,9 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `selector` | [`LabelSelector`](lib_k8s_cluster.LabelSelector.md) |
+| `template` | { `metadata`: [`KubeMetadata`](lib_k8s_cluster.KubeMetadata.md) ; `spec`: [`KubePodSpec`](lib_k8s_pod.KubePodSpec.md)  } |
+| `template.metadata` | [`KubeMetadata`](lib_k8s_cluster.KubeMetadata.md) |
+| `template.spec` | [`KubePodSpec`](lib_k8s_pod.KubePodSpec.md) |
 | `updateStrategy` | { `rollingUpdate`: { `partition`: `number`  } ; `type`: `string`  } |
 | `updateStrategy.rollingUpdate` | { `partition`: `number`  } |
 | `updateStrategy.rollingUpdate.partition` | `number` |
@@ -76,7 +86,7 @@ ___
 
 #### Defined in
 
-[lib/k8s/statefulSet.ts:5](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/statefulSet.ts#L5)
+[lib/k8s/statefulSet.ts:12](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/statefulSet.ts#L12)
 
 ___
 
@@ -90,4 +100,4 @@ ___
 
 #### Defined in
 
-[lib/k8s/statefulSet.ts:15](https://github.com/kinvolk/headlamp/blob/2fb68817/frontend/src/lib/k8s/statefulSet.ts#L15)
+[lib/k8s/statefulSet.ts:26](https://github.com/headlamp-k8s/headlamp/blob/072d2509b/frontend/src/lib/k8s/statefulSet.ts#L26)

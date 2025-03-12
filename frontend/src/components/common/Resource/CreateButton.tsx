@@ -1,79 +1,97 @@
-import { Icon } from '@iconify/react';
-import IconButton from '@material-ui/core/IconButton';
-import Tooltip from '@material-ui/core/Tooltip';
+import { InlineIcon } from '@iconify/react';
+import Button from '@mui/material/Button';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDispatch } from 'react-redux';
-import { useLocation } from 'react-router-dom';
-import { apply } from '../../../lib/k8s/apiProxy';
-import { KubeObjectInterface } from '../../../lib/k8s/cluster';
-import { clusterAction } from '../../../redux/actions/actions';
+import { useClusterGroup } from '../../../lib/k8s';
+import ActionButton from '../ActionButton';
 import EditorDialog from './EditorDialog';
 
-export default function CreateButton() {
-  const dispatch = useDispatch();
+interface CreateButtonProps {
+  isNarrow?: boolean;
+}
+
+export default function CreateButton(props: CreateButtonProps) {
+  const { isNarrow } = props;
+
   const [openDialog, setOpenDialog] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState('');
-  const location = useLocation();
-  const { t } = useTranslation('resource');
+  const { t } = useTranslation(['translation']);
+  const clusters = useClusterGroup();
+  const [targetCluster, setTargetCluster] = React.useState(clusters[0] || '');
 
-  const applyFunc = async (newItem: KubeObjectInterface) => {
-    try {
-      await apply(newItem);
-    } catch (err) {
-      let msg = t('Something went wrong…');
-      if (err instanceof Error) {
-        msg = err.message;
-      }
-      setErrorMessage(msg);
-      setOpenDialog(true);
-      throw err;
+  // We want to avoid resetting the dialog state on close.
+  const itemRef = React.useRef({});
+
+  // When the clusters in the group change, we want to reset the target cluster
+  // if it's not in the new list of clusters.
+  React.useEffect(() => {
+    if (clusters.length === 0) {
+      setTargetCluster('');
+    } else if (!clusters.includes(targetCluster)) {
+      setTargetCluster(clusters[0]);
     }
-  };
-
-  function handleSave(newItemDef: KubeObjectInterface) {
-    const cancelUrl = location.pathname;
-
-    if (!newItemDef.metadata?.name) {
-      setErrorMessage(t('Please set a name to the resource!'));
-      return;
-    }
-
-    if (!newItemDef.kind) {
-      setErrorMessage(t('Please set a kind to the resource!'));
-      return;
-    }
-
-    const newItemName = newItemDef.metadata.name;
-
-    setOpenDialog(false);
-    dispatch(
-      clusterAction(() => applyFunc(newItemDef), {
-        startMessage: t('Applying {{ newItemName }}…', { newItemName }),
-        cancelledMessage: t('Cancelled applying {{ newItemName }}.', { newItemName }),
-        successMessage: t('Applied {{ newItemName }}.', { newItemName }),
-        errorMessage: t('Failed to apply {{ newItemName }}.', { newItemName }),
-        cancelUrl,
-      })
-    );
-  }
+  }, [clusters]);
 
   return (
     <React.Fragment>
-      <Tooltip title={t('frequent|Create / Apply') as string}>
-        <IconButton aria-label={t('frequent|apply')} onClick={() => setOpenDialog(true)}>
-          <Icon color="#adadad" icon="mdi:plus-circle" width="48" />
-        </IconButton>
-      </Tooltip>
+      {isNarrow ? (
+        <ActionButton
+          description={t('translation|Create / Apply')}
+          onClick={() => setOpenDialog(true)}
+          icon="mdi:plus-box"
+          width="48"
+          iconButtonProps={{
+            color: 'primary',
+          }}
+        />
+      ) : (
+        <Button
+          onClick={() => {
+            setOpenDialog(true);
+          }}
+          startIcon={<InlineIcon icon="mdi:plus" />}
+          color="primary"
+          variant="contained"
+        >
+          {t('translation|Create')}
+        </Button>
+      )}
       <EditorDialog
-        item={{}}
+        item={itemRef.current}
         open={openDialog}
         onClose={() => setOpenDialog(false)}
-        onSave={handleSave}
-        saveLabel={t('frequent|Apply')}
+        setOpen={setOpenDialog}
+        saveLabel={t('translation|Apply')}
         errorMessage={errorMessage}
         onEditorChanged={() => setErrorMessage('')}
-        title={t('frequent|Create / Apply')}
+        title={t('translation|Create / Apply')}
+        actions={
+          clusters.length > 1
+            ? [
+                <FormControl>
+                  <InputLabel id="edit-dialog-cluster-target">{t('glossary|Cluster')}</InputLabel>
+                  <Select
+                    labelId="edit-dialog-cluster-target"
+                    id="edit-dialog-cluster-target-select"
+                    value={targetCluster}
+                    onChange={event => {
+                      setTargetCluster(event.target.value as string);
+                    }}
+                  >
+                    {clusters.map(cluster => (
+                      <MenuItem key={cluster} value={cluster}>
+                        {cluster}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>,
+              ]
+            : []
+        }
       />
     </React.Fragment>
   );

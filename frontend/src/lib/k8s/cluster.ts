@@ -1,433 +1,468 @@
-import { OpPatch } from 'json-patch';
-import React from 'react';
-import { createRouteURL } from '../router';
-import { timeAgo, useErrorState } from '../util';
-import { useConnectApi } from '.';
-import { ApiError, apiFactory, apiFactoryWithNamespace, post } from './apiProxy';
-import CronJob from './cronJob';
-import DaemonSet from './daemonSet';
-import Deployment from './deployment';
-import { KubeEvent } from './event';
-import Job from './job';
-import ReplicaSet from './replicaSet';
-import StatefulSet from './statefulSet';
+import helpers from '../../helpers';
+import { getCluster } from '../util';
+import { KubeMetadata } from './KubeMetadata';
+export {
+  KubeObject,
+  makeKubeObject,
+  type KubeObjectClass,
+  type KubeObjectInterface,
+  type ApiListOptions,
+  type ApiListSingleNamespaceOptions,
+  type AuthRequestResourceAttrs,
+} from './KubeObject';
+export { type KubeMetadata } from './KubeMetadata';
+export { type Workload } from './Workload';
+
+export const HEADLAMP_ALLOWED_NAMESPACES = 'headlamp.allowed-namespaces';
+
+/**
+ * Gives an optionally configured list of allowed namespaces.
+ *
+ * @param cluster Optional cluster to check for allowed namespaces.
+ *                If not given the current cluster allowed name spaces are used.
+ *
+ * @returns A list of configured name spaces for the given cluster or current cluster.
+ *          If a zero length list, then no allowed namespace has been configured for cluster.
+ *          If length > 0, allowed namespaces have been configured for this cluster.
+ *          If not in a cluster it returns [].
+ *
+ * There are cases where a user doesn't have the authority to list
+ * all the namespaces. In that case it becomes difficult to access things
+ * around Headlamp. To prevent this we can allow the user to pass a set
+ * of namespaces they know they have access to and we can use this set to
+ * make requests to the API server.
+ */
+export function getAllowedNamespaces(cluster: string | null = getCluster()): string[] {
+  if (!cluster) {
+    return [];
+  }
+
+  const clusterSettings = helpers.loadClusterSettings(cluster);
+  return clusterSettings.allowedNamespaces || [];
+}
 
 export interface Cluster {
   name: string;
   useToken?: boolean;
+  /**
+   * Either 'oidc' or ''. '' means unknown.
+   */
+  auth_type: string;
   [propName: string]: any;
-}
-
-export interface KubeObjectInterface {
-  kind: string;
-  apiVersion?: string;
-  metadata: KubeMetadata;
-  [otherProps: string]: any;
 }
 
 export interface StringDict {
   [key: string]: string;
 }
 
-export interface KubeMetadata {
-  uid: string;
-  name: string;
-  namespace?: string;
-  creationTimestamp: string;
-  resourceVersion: string;
-  selfLink: string;
-  labels?: StringDict;
-  annotations?: StringDict;
-  ownerReferences?: KubeOwnerReference[];
-}
-
 export interface KubeOwnerReference {
+  /** API version of the referent. */
   apiVersion: string;
+  /**
+   * If true, AND if the owner has the "foregroundDeletion" finalizer, then the owner cannot
+   * be deleted from the key-value store until this reference is removed.
+   *
+   * @see {@link https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-deletion | foreground deletion}
+   * for how the garbage collector interacts with this field and enforces the foreground deletion.
+   *
+   * Defaults to false. To set this field, a user needs "delete" permission of the owner,
+   * otherwise 422 (Unprocessable Entity) will be returned.
+   *
+   */
   blockOwnerDeletion: boolean;
+  /** If true, this reference points to the managing controller. */
   controller: boolean;
+  /** Kind of the referent. */
   kind: string;
+  /** Name of the referent. */
   name: string;
+  /** UID of the referent. */
   uid: string;
 }
 
-export interface ApiListOptions {
-  namespace?: string | string[];
+/**
+ * ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the
+ * resource that the fieldset applies to.
+ */
+export interface KubeManagedFieldsEntry {
+  /**
+   * APIVersion defines the version of this resource that this field set applies to.
+   * The format is "group/version" just like the top-level APIVersion field.
+   * It is necessary to track the version of a field set because it cannot be
+   * automatically converted.
+   */
+  apiVersion: string;
+  /**
+   * FieldsType is the discriminator for the different fields format and version.
+   * There is currently only one possible value: "FieldsV1"
+   */
+  fieldsType: string;
+  /**
+   * FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
+   */
+  fieldsV1: object;
+  /**
+   * Manager is an identifier of the workflow managing these fields.
+   */
+  manager: string;
+  /**
+   * Operation is the type of operation which lead to this ManagedFieldsEntry being
+   * created. The only valid values for this field are 'Apply' and 'Update'.
+   */
+  operation: string;
+  /**
+   * Subresource is the name of the subresource used to update that object, or empty
+   * string if the object was updated through the main resource. The value of this
+   * field is used to distinguish between managers, even if they share the same name.
+   * For example, a status update will be distinct from a regular update using the
+   * same manager name. Note that the APIVersion field is not related to the
+   * Subresource field and it always corresponds to the version of the main resource.
+   */
+  subresource: string;
+  /**
+   * Time is the timestamp of when the ManagedFields entry was added.The timestamp
+   * will also be updated if a field is added, the manager changes any of the owned
+   * fields value or removes a field. The timestamp does not update when a field is
+   * removed from the entry because another manager took it over.
+   */
+  timestamp: string;
 }
 
-// We have to define a KubeObject implementation here because the KubeObject
-// class is defined within the function and therefore not inferable.
-export interface KubeObjectIface<T extends KubeObjectInterface | KubeEvent> {
-  apiList: (onList: (arg: InstanceType<KubeObjectIface<T>>[]) => void) => any;
-  useApiList: (
-    onList: (arg: InstanceType<KubeObjectIface<T>>[]) => void,
-    onError?: (err: ApiError) => void,
-    opts?: ApiListOptions
-  ) => any;
-  useApiGet: (
-    onGet: (...args: any) => void,
-    name: string,
-    namespace?: string,
-    onError?: (err: ApiError) => void
-  ) => void;
-  useList: (
-    opts?: ApiListOptions
-  ) => [any[], ApiError | null, (items: any[]) => void, (err: ApiError | null) => void];
-  getErrorMessage: (err?: ApiError | null) => string | null;
-  new (json: T): any;
-  className: string;
-  [prop: string]: any;
-}
+/**
+ * @deprecated For backwards compatibility, please use KubeManagedFieldsEntry
+ */
+export interface KubeManagedFields extends KubeManagedFieldsEntry {}
 
-export function makeKubeObject<T extends KubeObjectInterface | KubeEvent>(
-  objectName: string
-): KubeObjectIface<T> {
-  class KubeObject {
-    static apiEndpoint: ReturnType<typeof apiFactoryWithNamespace | typeof apiFactory>;
-    jsonData: T | null = null;
+/**
+ * @deprecated For backwards compatibility, please use KubeObject
+ */
+export type KubeObjectIface = any;
 
-    constructor(json: T) {
-      this.jsonData = json;
-    }
+export type Time = number | string | null;
 
-    static get className(): string {
-      return objectName;
-    }
-
-    get detailsRoute(): string {
-      return this._class().className;
-    }
-
-    get listRoute(): string {
-      return this.detailsRoute + 's';
-    }
-
-    getDetailsLink() {
-      const params = {
-        namespace: this.getNamespace(),
-        name: this.getName(),
-      };
-      const link = createRouteURL(this.detailsRoute, params);
-      return link;
-    }
-
-    getListLink() {
-      return createRouteURL(this.listRoute);
-    }
-
-    getName() {
-      return this.metadata.name;
-    }
-
-    getNamespace() {
-      return this.metadata.namespace;
-    }
-
-    getCreationTs() {
-      return this.metadata.creationTimestamp;
-    }
-
-    getAge() {
-      return timeAgo(this.getCreationTs());
-    }
-
-    getValue(prop: string) {
-      return this.jsonData![prop];
-    }
-
-    get metadata() {
-      return this.jsonData!.metadata;
-    }
-
-    get kind() {
-      return this.jsonData!.kind;
-    }
-
-    static apiList<U extends KubeObject>(
-      onList: (arg: U[]) => void,
-      onError?: (err: ApiError) => void,
-      opts?: {
-        namespace?: string;
-      }
-    ) {
-      const createInstance = (item: T) => this.create(item) as U;
-
-      const args: any[] = [(list: T[]) => onList(list.map((item: T) => createInstance(item) as U))];
-
-      if (this.apiEndpoint.isNamespaced) {
-        args.unshift(opts?.namespace || null);
-      }
-
-      if (onError) {
-        args.push(onError);
-      }
-
-      return this.apiEndpoint.list.bind(null, ...args);
-    }
-
-    static useApiList<U extends KubeObject>(
-      onList: (...arg: any[]) => any,
-      onError?: (err: ApiError) => void,
-      opts?: ApiListOptions
-    ) {
-      const [objs, setObjs] = React.useState<{ [key: string]: U[] }>({});
-      const listCallback = onList as (arg: U[]) => void;
-
-      function onObjs(namespace: string, objList: U[]) {
-        if (objList.length > 0) {
-          let newObjs: typeof objs = {};
-          // Set the objects so we have them for the next API response...
-          setObjs(previousObjs => {
-            newObjs = { ...previousObjs, [namespace || '']: objList };
-            return newObjs;
-          });
-
-          let allObjs: U[] = [];
-          Object.values(newObjs).map(currentObjs => {
-            allObjs = allObjs.concat(currentObjs);
-          });
-
-          listCallback(allObjs);
-        }
-      }
-
-      const listCalls = [];
-      if (!!opts?.namespace) {
-        let namespaces: string[] = [];
-        if (typeof opts.namespace === 'string') {
-          namespaces = [opts.namespace];
-        } else if (Array.isArray(opts.namespace)) {
-          namespaces = opts.namespace as string[];
-        } else {
-          throw Error('namespace should be a string or array of strings');
-        }
-
-        for (const namespace of namespaces) {
-          listCalls.push(
-            this.apiList(objList => onObjs(namespace, objList as U[]), onError, { namespace })
-          );
-        }
-      } else {
-        // If we don't have a namespace set, then we only have one API call
-        // response to set and we return it right away.
-        listCalls.push(this.apiList(listCallback, onError));
-      }
-
-      useConnectApi(...listCalls);
-    }
-
-    static useList<U extends KubeObject>(
-      opts?: ApiListOptions
-    ): [U[] | null, ApiError | null, (items: U[]) => void, (err: ApiError | null) => void] {
-      const [objList, setObjList] = React.useState<U[] | null>(null);
-      const [error, setError] = useErrorState(setObjList);
-
-      function setList(items: U[] | null) {
-        setObjList(items);
-        if (items !== null) {
-          setError(null);
-        }
-      }
-
-      this.useApiList(setList, setError, opts);
-
-      // Return getters and then the setters as the getters are more likely to be used with
-      // this function.
-      return [objList, error, setObjList, setError];
-    }
-
-    static create<U extends KubeObject>(this: new (arg: T) => U, item: T): U {
-      return new this(item) as U;
-    }
-
-    static apiGet<U extends KubeObject>(
-      onGet: (...args: any) => void,
-      name: string,
-      namespace?: string,
-      onError?: (err: ApiError | null) => void
-    ) {
-      const createInstance = (item: T) => this.create(item) as U;
-      const args: any[] = [name, (obj: T) => onGet(createInstance(obj))];
-
-      if (this.apiEndpoint.isNamespaced) {
-        args.unshift(namespace);
-      }
-
-      if (!!onError) {
-        args.push(onError);
-      }
-
-      return this.apiEndpoint.get.bind(null, ...args);
-    }
-
-    static useApiGet<U extends KubeObject>(
-      onGet: (...args: any) => any,
-      name: string,
-      namespace?: string,
-      onError?: (err: ApiError | null) => void
-    ) {
-      // We do the type conversion here because we want to be able to use hooks that may not have
-      // the exact signature as get callbacks.
-      const getCallback = onGet as (item: U) => void;
-      useConnectApi(this.apiGet(getCallback, name, namespace, onError));
-    }
-
-    private _class() {
-      return this.constructor as typeof KubeObject;
-    }
-
-    delete() {
-      const args: string[] = [this.getName()];
-      if (this._class().apiEndpoint.isNamespaced) {
-        args.unshift(this.getNamespace()!);
-      }
-
-      return this._class().apiEndpoint.delete(...args);
-    }
-
-    update(data: KubeObjectInterface) {
-      return this._class().put(data);
-    }
-
-    static put(data: KubeObjectInterface) {
-      return this.apiEndpoint.put(data);
-    }
-
-    patch(body: OpPatch[]) {
-      const patchMethod = this._class().apiEndpoint.patch;
-      const args: Parameters<typeof patchMethod> = [body];
-
-      if (this._class().apiEndpoint.isNamespaced) {
-        args.push(this.getNamespace());
-      }
-
-      args.push(this.getName());
-      return this._class().apiEndpoint.patch(...args);
-    }
-
-    async getAuthorization(verb: string) {
-      const resourceAttrs: {
-        name: string;
-        verb: string;
-        namespace?: string;
-      } = {
-        name: this.getName(),
-        verb,
-      };
-
-      const namespace = this.getNamespace();
-      if (!!namespace) {
-        resourceAttrs['namespace'] = namespace;
-      }
-
-      const spec = {
-        resourceAttributes: resourceAttrs,
-      };
-
-      const versions = ['v1', 'v1beta1'];
-      for (let i = 0; i < versions.length; i++) {
-        const version = versions[i];
-        try {
-          return await post(
-            `/apis/authorization.k8s.io/${version}/selfsubjectaccessreviews`,
-            {
-              kind: 'SelfSubjectAccessReview',
-              apiVersion: `authorization.k8s.io/${version}`,
-              spec,
-            },
-            false
-          );
-        } catch (err) {
-          // If this is the last attempt or the error is not 404, let it throw.
-          if ((err as ApiError).status !== 404 || i === versions.length - 1) {
-            throw err;
-          }
-        }
-      }
-    }
-
-    static getErrorMessage(err: ApiError | null) {
-      if (!err) {
-        return null;
-      }
-
-      switch (err.status) {
-        case 404:
-          return 'Error: Not found';
-        case 403:
-          return 'Error: No permissions';
-        default:
-          return 'Error';
-      }
-    }
-  }
-
-  return KubeObject as KubeObjectIface<T>;
-}
-
-export type KubeObjectClass = ReturnType<typeof makeKubeObject>;
-export type KubeObject = InstanceType<KubeObjectClass>;
+// @todo: There are different Condition types, including PodCondition, NodeCondition, etc.
+// We should have appropriate types for each of them, because they can be slightly different.
+// eg. DaemonSetCondition does not have lastProbeTime.
+// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#podcondition-v1-core
+// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#nodecondition-v1-core
 
 export interface KubeCondition {
-  type: string;
-  status: string;
-  lastProbeTime: number;
-  lastTransitionTime?: string;
-  lastUpdateTime?: string;
-  reason?: string;
+  /** Last time we probed the condition. */
+  lastProbeTime: Time;
+  lastTransitionTime?: Time;
+  lastUpdateTime?: Time;
   message?: string;
+  /** Unique, one-word, CamelCase reason for the condition's last transition. */
+  reason?: string;
+  /** Status of the condition, one of True, False, Unknown. */
+  status: string;
+  type: string;
 }
 
+/**
+ *
+ * @link https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#container-v1-core
+ */
 export interface KubeContainer {
-  name: string;
-  image: string;
-  command?: string[];
+  /**
+   * Arguments to the entrypoint. The container image's CMD is used if this is not provided.
+   * Variable references $(VAR_NAME) are expanded using the container's environment.
+   * If a variable cannot be resolved, the reference in the input string will be unchanged.
+   * Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME)
+   * syntax: i.e. "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+   * Escaped references will never be expanded, regardless of whether the variable exists or not.
+   * Cannot be updated.
+   *
+   * @see {@link https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell | more information}
+   */
   args?: string[];
-  ports: {
-    name?: string;
-    containerPort: number;
-    protocol: string;
-  }[];
-  resources?: {
-    limits: {
-      cpu: string;
-      memory: string;
-    };
-    requests: {
-      cpu: string;
-      memory: string;
-    };
-  };
+  /**
+   * Entrypoint array. Not executed within a shell. The container image's ENTRYPOINT is used if
+   * this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment.
+   * If a variable cannot be resolved, the reference in the input string will be unchanged.
+   * Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME)
+   * syntax: i.e. "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+   * Escaped references will never be expanded, regardless of whether the variable exists or not.
+   * Cannot be updated.
+   *
+   * @see {@link https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell | more information}
+   */
+  command?: string[];
+
+  /** List of environment variables to set in the container. Cannot be updated. */
   env?: {
+    /** Name of the environment variable. Must be a C_IDENTIFIER. */
     name: string;
+    /**
+     * Variable references $(VAR_NAME) are expanded using the previously defined environment variables
+     * in the container and any service environment variables. If a variable cannot be resolved, the
+     * reference in the input string will be unchanged. Double $$ are reduced to a single $, which
+     * allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
+     * string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless of whether
+     * the variable exists or not. Defaults to "".
+     */
     value?: string;
+    /** Source for the environment variable's value. Cannot be used if value is not empty. */
     valueFrom?: {
+      /** Selects a key of a ConfigMap. */
+      configMapKeyRef?: {
+        /** The key to select. */
+        key: string;
+        /** Name of the referent. */
+        name: string;
+        /** Specify whether the ConfigMap or its key must be defined */
+        optional?: boolean;
+      };
+      /**
+       * Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`,
+       * `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP,
+       * status.podIP, status.podIPs.
+       */
       fieldRef?: {
+        /** Version of the schema the FieldPath is written in terms of, defaults to "v1". */
         apiVersion: string;
+        /** Path of the field to select in the specified API version. */
         fieldPath: string;
       };
-      secretKeyRef?: {
-        key: string;
-        name: string;
+      /**
+       * Selects a resource of the container: only resources limits and requests
+       * (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory
+       *  and requests.ephemeral-storage) are currently supported.
+       */
+      resourceFieldRef?: {
+        /** Container name: required for volumes, optional for env vars */
+        containerName?: string;
+        /**
+         * Specifies the output format of the exposed resources, defaults to "1".
+         *
+         * @see {@link https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#quantity-resource-core | Quantity}
+         */
+        divisor?: string;
+        /** Required: resource to select */
+        resource: string;
       };
-      configMapKeyRef?: {
+      /** Selects a key of a secret in the pod's namespace */
+      secretKeyRef?: {
+        /** The key of the secret to select from. Must be a valid secret key. */
         key: string;
+        /** Name of the referent. */
         name: string;
+        /** Specify whether the Secret or its key must be defined */
+        optional?: boolean;
       };
     };
   }[];
   envFrom?: {
+    /** SecretEnvSource	The Secret to select from */
+    secretRef?: {
+      /** Name of the referent. */
+      name: string;
+      /** Specify whether the Secret must be defined */
+      optional?: boolean;
+    };
     configMapRef?: {
+      /** Name of the referent. */
+      name: string;
+      /** Specify whether the ConfigMap must be defined */
+      optional?: boolean;
+    };
+    /** An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER. */
+    prefix?: string;
+  }[];
+
+  /**
+   * Container image name. This field is optional to allow higher level config management to
+   * default or override container images in workload controllers like Deployments and StatefulSets.
+   *
+   * @see {@link https://kubernetes.io/docs/concepts/containers/images | more info}
+   */
+  image: string;
+
+  /**
+   * Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is
+   * specified, or IfNotPresent otherwise. Cannot be updated.
+   *
+   * @see {@link https://kubernetes.io/docs/concepts/containers/images#updating-images | more info}
+   */
+  imagePullPolicy: string;
+
+  // @todo: Add lifecycle field.
+
+  /**
+   * Periodic probe of container liveness. Container will be restarted if the probe fails.
+   * Cannot be updated.
+   *
+   * @see {@link https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes | more info}
+   */
+  livenessProbe?: KubeContainerProbe;
+
+  /**
+   * Name of the container specified as a DNS_LABEL.
+   * Each container in a pod must have a unique name (DNS_LABEL).
+   *
+   * Cannot be updated.
+   */
+  name: string;
+
+  /**
+   * List of ports to expose from the container. Not specifying a port here DOES NOT prevent that
+   * port from being exposed. Any port which is listening on the default "0.0.0.0" address inside
+   * a container will be accessible from the network. Modifying this array with strategic merge
+   * patch may corrupt the data. For more information See https://github.com/kubernetes/kubernetes/issues/108255.
+   *
+   * Cannot be updated.
+   *
+   * https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#containerport-v1-core
+   */
+  ports?: {
+    /** Number of port to expose on the pod's IP address. This must be a valid port number, 0 < x < 65536. */
+    containerPort: number;
+    /** What host IP to bind the external port to. */
+    hostIP?: string;
+    /**
+     * Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536.
+     * If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.
+     */
+    hostPort?: number;
+    /** If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services. */
+    name?: string;
+    /** Protocol for port. Must be UDP, TCP, or SCTP. Defaults to "TCP". */
+    protocol?: string;
+  }[];
+  /**
+   * Periodic probe of container service readiness. Container will be removed from service endpoints
+   * if the probe fails.
+   *
+   * Cannot be updated.
+   *
+   * @see {@link https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes | more info}
+   */
+  readinessProbe?: KubeContainerProbe;
+  /** Resources resize policy for the container. */
+  resizePolicy?: {
+    /**
+     * Name of the resource to which this resource resize policy applies.
+     * Supported values: cpu, memory.
+     */
+    resourceName: string;
+    /**
+     * Restart policy to apply when specified resource is resized.
+     * If not specified, it defaults to NotRequired.
+     */
+    restartPolicy?: string;
+  }[];
+  /**
+   * Compute Resources required by this container. Cannot be updated.
+   *
+   * @see {@link https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ | more info}
+   *
+   * https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core
+   */
+  resources?: {
+    claims?: {
+      /**
+       * Name must match the name of one entry in pod.spec.resourceClaims of the Pod where
+       * this field is used. It makes that resource available inside a container.
+       */
       name: string;
     };
-  }[];
+    /**
+     * Limits describes the maximum amount of compute resources allowed.
+     *
+     * @see {@link https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/ | more info}
+     *
+     * Can also have hugpages like: "hugepages-2Mi": "100Mi" // Requesting 100 Mebibytes of 2 MiB HugePages
+     */
+    limits?: {
+      /** example "100m", 100 milliCPU (0.1 CPU core) */
+      cpu?: string;
+      /** example , "256Mi" 256 Mebibytes */
+      memory?: string;
+    };
+    requests?: {
+      /** example "500m", 500 milliCPU (0.5 CPU core) */
+      cpu?: string;
+      /** example , "1Gi" 1 Gibibyte */
+      memory?: string;
+    };
+  };
+
+  // @todo:
+  // securityContext SecurityContext	SecurityContext defines the security options the container should be run with. If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext. More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+  // startupProbe Probe	StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+
+  /**
+   * Path at which the file to which the container's termination message will be written is mounted
+   * into the container's filesystem. Message written is intended to be brief final status, such as
+   * an assertion failure message. Will be truncated by the node if greater than 4096 bytes.
+   * The total message length across all containers will be limited to 12kb.
+   * Defaults to /dev/termination-log.
+   *
+   * Cannot be updated.
+   */
+  terminationMessagePath?: string;
+
+  /**
+   * Indicate how the termination message should be populated. File will use the contents of
+   * terminationMessagePath to populate the container status message on both success and failure.
+   * FallbackToLogsOnError will use the last chunk of container log output if the termination message
+   * file is empty and the container exited with an error. The log output is limited to 2048 bytes or
+   * 80 lines, whichever is smaller. Defaults to File.
+   *
+   * Cannot be updated.
+   */
+  terminationMessagePolicy?: string;
+
   volumeMounts?: {
     name: string;
     readOnly: boolean;
     mountPath: string;
   }[];
-  livenessProbe?: KubeContainerProbe;
-  readinessProbe?: KubeContainerProbe;
-  imagePullPolicy: string;
+
+  /**
+   * Whether this container should allocate a buffer for stdin in the container runtime.
+   * If this is not set, reads from stdin in the container will always result in EOF.
+   *
+   * Default is false.
+   */
+  stdin?: boolean;
+  /**
+   * Whether the container runtime should close the stdin channel after it has been opened
+   * by a single attach. When stdin is true the stdin stream will remain open across
+   * multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start,
+   * is empty until the first client attaches to stdin, and then remains open and accepts data
+   * until the client disconnects, at which time stdin is closed and remains closed until the
+   * container is restarted. If this flag is false, a container processes that reads from stdin
+   * will never receive an EOF.
+   *
+   * Default is false
+   */
+  stdinOnce?: boolean;
+  /**
+   * Whether this container should allocate a TTY for itself, also requires
+   * 'stdin' to be true.
+   *
+   * Default is false.
+   */
+  tty?: boolean;
+  /**
+   * volumeDevices is the list of block devices to be used by the container.
+   *
+   * patch strategy: merge
+   * patch merge key: devicePath
+   */
+  volumeDevices?: {
+    /** devicePath is the path inside of the container that the device will be mapped to. */
+    devicePath: string;
+    /** name must match the name of a persistentVolumeClaim in the pod */
+    name: string;
+  }[];
+  /**
+   * Container's working directory. If not specified, the container runtime's default
+   * will be used, which might be configured in the container image.
+   * Cannot be updated.
+   */
+  workingDir?: string;
 }
 
 export interface KubeContainerProbe {
@@ -455,7 +490,7 @@ export interface LabelSelector {
     key: string;
     operator: string;
     values: string[];
-  };
+  }[];
   matchLabels?: {
     [key: string]: string;
   };
@@ -475,32 +510,33 @@ export interface KubeMetrics {
   };
 }
 
-export interface KubeContainerStatus {
-  containerID: string;
-  image: string;
-  imageID: string;
-  lastState: string;
-  name: string;
-  ready: boolean;
-  restartCount: number;
-  state: {
-    running: {
-      startedAt: number;
-    };
-    terminated: {
-      containerID: string;
-      exitCode: number;
-      finishedAt: number;
-      message: string;
-      reason: string;
-      signal: number;
-      startedAt: number;
-    };
-    waiting: {
-      message: string;
-      reason: string;
-    };
+export interface ContainerState {
+  running: {
+    startedAt: string;
+  };
+  terminated: {
+    containerID: string;
+    exitCode: number;
+    finishedAt: string;
+    message?: string;
+    reason: string;
+    signal?: number;
+    startedAt: string;
+  };
+  waiting: {
+    message?: string;
+    reason: string;
   };
 }
 
-export type Workload = DaemonSet | ReplicaSet | StatefulSet | Job | CronJob | Deployment;
+export interface KubeContainerStatus {
+  containerID?: string;
+  image: string;
+  imageID: string;
+  name: string;
+  ready: boolean;
+  restartCount: number;
+  lastState: Partial<ContainerState>;
+  state: Partial<ContainerState>;
+  started?: boolean;
+}

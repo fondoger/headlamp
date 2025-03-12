@@ -1,7 +1,5 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import DetailsViewPluginRenderer from '../../helpers/renderHelpers';
 import DaemonSet from '../../lib/k8s/daemonSet';
 import { SectionBox, SimpleTable } from '../common';
 import {
@@ -13,11 +11,12 @@ import {
 
 interface TolerationsSection {
   resource: DaemonSet;
-  t: (...args: any[]) => string;
+  t?: (...args: any[]) => string;
 }
 
 function TolerationsSection(props: TolerationsSection) {
-  const { resource, t } = props;
+  const { resource } = props;
+  const { t } = useTranslation(['glossary', 'translation']);
 
   if (!resource) {
     return null;
@@ -40,40 +39,43 @@ function TolerationsSection(props: TolerationsSection) {
         data={tolerations}
         columns={[
           {
-            label: t('frequent|Key'),
+            label: t('translation|Key'),
             getter: toleration => toleration.key,
             sort: true,
           },
           {
-            label: t('frequent|Operator'),
+            label: t('translation|Operator'),
             getter: toleration => toleration.operator,
             sort: true,
           },
           {
-            label: t('frequent|Value'),
+            label: t('translation|Value'),
             getter: toleration => toleration.value,
             sort: true,
           },
           {
-            label: t('frequent|Effect'),
+            label: t('translation|Effect'),
             getter: toleration => getEffectString(toleration.effect, toleration.tolerationSeconds),
             sort: true,
           },
         ]}
+        reflectInURL="tolerations"
       />
     </SectionBox>
   );
 }
 
-export default function DaemonSetDetails() {
-  const { namespace, name } = useParams<{ namespace: string; name: string }>();
-  const { t } = useTranslation(['glossary', 'frequent']);
+export default function DaemonSetDetails(props: { name?: string; namespace?: string }) {
+  const params = useParams<{ namespace: string; name: string }>();
+  const { name = params.name, namespace = params.namespace } = props;
+  const { t } = useTranslation(['glossary', 'translation']);
 
   return (
     <DetailsGrid
       resourceType={DaemonSet}
       name={name}
       namespace={namespace}
+      withEvents
       extraInfo={item =>
         item && [
           {
@@ -90,18 +92,20 @@ export default function DaemonSetDetails() {
           },
         ]
       }
-      sectionsFunc={item => (
-        <>
-          {item && (
-            <>
-              <OwnedPodsSection resource={item?.jsonData} />
-              <TolerationsSection resource={item} t={t} />
-              <ContainersSection resource={item?.jsonData} />
-            </>
-          )}
-          <DetailsViewPluginRenderer resource={item} />
-        </>
-      )}
+      extraSections={item => [
+        {
+          id: 'headlamp.daemonset-owned-pods',
+          section: <OwnedPodsSection resource={item?.jsonData} />,
+        },
+        {
+          id: 'headlamp.daemonset-tolerations',
+          section: <TolerationsSection resource={item} />,
+        },
+        {
+          id: 'headlamp.daemonset-containers',
+          section: <ContainersSection resource={item?.jsonData} />,
+        },
+      ]}
     />
   );
 }

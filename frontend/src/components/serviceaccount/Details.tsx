@@ -5,8 +5,9 @@ import ServiceAccount from '../../lib/k8s/serviceAccount';
 import { Link } from '../common';
 import { DetailsGrid } from '../common/Resource';
 
-export default function ServiceAccountDetails() {
-  const { namespace, name } = useParams<{ namespace: string; name: string }>();
+export default function ServiceAccountDetails(props: { name?: string; namespace?: string }) {
+  const params = useParams<{ namespace: string; name: string }>();
+  const { name = params.name, namespace = params.namespace } = props;
   const { t } = useTranslation('glossary');
 
   return (
@@ -14,13 +15,14 @@ export default function ServiceAccountDetails() {
       resourceType={ServiceAccount}
       name={name}
       namespace={namespace}
-      extraInfo={(item: ServiceAccount) =>
+      withEvents
+      extraInfo={item =>
         item && [
           {
             name: t('Secrets'),
             value: (
               <React.Fragment>
-                {item.secrets.map(({ name }, index) => (
+                {item.secrets?.map(({ name }, index) => (
                   <React.Fragment key={`${name}__${index}`}>
                     <Link routeName={'secret'} params={{ namespace, name }}>
                       {name}
